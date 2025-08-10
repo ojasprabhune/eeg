@@ -1,0 +1,4 @@
+**/__pycache__
+**/eeg.egg-info
+.venv/
+win_venv/
