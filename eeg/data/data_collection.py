@@ -56,6 +56,15 @@ def hand_detection(hands, frame):
 # getting camera / webcam (0, 1, 2 for connected webcams)
 cap = cv2.VideoCapture(0)
 
+# desired FPS
+set_fps = 30
+# set FPS to camera
+cap.set(cv2.CAP_PROP_FPS, set_fps)
+# verify FPS
+fps = cap.get(cv2.CAP_PROP_FPS)
+# log FPS for verification
+print(f"Set FPS: {set_fps}\nFPS: {fps}")
+
 # resource management: open hands as the term below and close it automatically
 # two metrics:
 # 1. detection: threshold for initial detection to be successful
