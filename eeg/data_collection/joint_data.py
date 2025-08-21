@@ -20,11 +20,11 @@ class JointData:
         if component is None:
             positions = self.data[:, start : start + 3]
         elif component == "x":
-            positions = self.data[:, start : start + 1]
+            positions = self.data[:, start]
         elif component == "y":
-            positions = self.data[:, start + 1 : start + 2]
+            positions = self.data[:, start + 1]
         elif component == "z":
-            positions = self.data[:, start + 2 : start + 3]
+            positions = self.data[:, start + 2]
         else:
             raise ValueError(f"Unknown component: {component}")
         return positions
@@ -33,7 +33,10 @@ class JointData:
         return self.data
 
     # plot function for a joint
-    def plot_data(self, joint: Joint):
+    def plot_data(self, joint: str | Joint):
+        if isinstance(joint, str):
+            joint = Joint.from_str(joint)
+
         def plot(x: list, y: list, ax: np.ndarray, xlabel: str, ylabel: str):
             ax.plot(x, y)  # plot graph
             ax.set_xlabel(xlabel)  # x label
