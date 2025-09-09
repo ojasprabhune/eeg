@@ -79,7 +79,9 @@ class JointData:
         plt.show()
 
     @staticmethod
-    def plot_model_traces(expected_data: np.ndarray, predicted_data: np.ndarray, joint: Joint):
+    def plot_model_traces(
+        expected_data: np.ndarray, predicted_data: np.ndarray, joint: Joint
+    ):
         fig, ax = plt.subplots(3, 1, figsize=(10, 8))
 
         x_data = expected_data[:, joint.value * 3]
@@ -116,3 +118,4 @@ class JointData:
         ax[2].set_ylabel("Z position")
 
         plt.show()
+
