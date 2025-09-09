@@ -1,20 +1,29 @@
-import mediapipe as mp
-import numpy as np
-import cv2
 import argparse
 import time
 
-from eeg.data_collection import Joint
+import cv2
+import mediapipe as mp
+import numpy as np
+
 from eeg.data_collection import JointData
 
 parser = argparse.ArgumentParser(
-                                 prog="Collect data",
-                                 description="Run hand pose detection and obtain joint position deltas"
-                                 )
+    prog="Collect data",
+    description="Run hand pose detection and obtain joint position deltas",
+)
 parser.add_argument("filename", type=str, help="The file name of the npy data")
-parser.add_argument("data_time", type=int, help="Length of hand pose estimation data in seconds")
-parser.add_argument("--save_video", type=bool, default=False, help="Saves a video of hand pose estimation if True")
-parser.add_argument("--plot", type=bool, default=False, help="Plots the results if True")
+parser.add_argument(
+    "data_time", type=int, help="Length of hand pose estimation data in seconds"
+)
+parser.add_argument(
+    "--save_video",
+    type=bool,
+    default=False,
+    help="Saves a video of hand pose estimation if True",
+)
+parser.add_argument(
+    "--plot", type=bool, default=False, help="Plots the results if True"
+)
 parser.add_argument("--joint", type=str, default="W", help="Joint data to plot")
 args = parser.parse_args()
 
@@ -42,10 +51,9 @@ def hand_detection(mp_hands, mp_drawing, joint_data: list, set_fps: int):
     if args.save_video:
         path = f"data/videos/{filename}.mp4"
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-        width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))   # float `width`
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))  # float `width`
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))  # float `height`
         writer = cv2.VideoWriter(path, fourcc, fps, (width, height))
-
 
     # resource management: open hands as the term below and close it automatically
     # two metrics:
@@ -117,7 +125,9 @@ def hand_detection(mp_hands, mp_drawing, joint_data: list, set_fps: int):
 
             # render image to screen using OpenCV with "Hand tracking" window title
             cv2.imshow("Hand tracking", frame)
-            writer.write(frame)
+
+            if args.save_video:
+                writer.write(frame)
 
             # hit "q" and close window
             if cv2.waitKey(10) & 0xFF == ord("q"):
@@ -125,7 +135,6 @@ def hand_detection(mp_hands, mp_drawing, joint_data: list, set_fps: int):
 
             if time.time() > data_time:
                 break
-
 
     # release webcam
     cap.release()
