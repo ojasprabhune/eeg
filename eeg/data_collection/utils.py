@@ -3,7 +3,7 @@ import os
 
 
 def normalize(
-    value: float,
+    value,
     old_max: float,
     old_min: float,
     new_max: float,
@@ -19,7 +19,7 @@ def normalize(
     return new_value
 
 
-def min_max(directory_path):
+def min_max_npy(directory_path):
     """
     Finds the overall minimum and maximum values across all .npy files in a given directory.
 
@@ -54,17 +54,18 @@ def min_max(directory_path):
     return overall_min, overall_max
 
 
-# Example usage:
-directory = "/home/prabhune/projects/research/2026/eeg/data/"  # Replace with the actual path to your directory
-min_val, max_val = min_max(directory)
+if __name__ == "__main__":
+    # example usage:
+    directory = "/home/prabhune/projects/research/2026/eeg/data/"  # Replace with the actual path to your directory
+    min_val, max_val = min_max_npy(directory)
 
-print(f"Minimum value: {min_val}")
-print(f"Maximum value: {max_val}")
+    print(f"Minimum value: {min_val}")
+    print(f"Maximum value: {max_val}")
 
-min_value = normalize(min_val, max_val, min_val, 1, -1)
-max_value = normalize(max_val, max_val, min_val, 1, -1)
-middle = normalize(-48.5, max_val, min_val, 1, -1)
+    min_value = normalize(min_val, max_val, min_val, 1, -1)
+    max_value = normalize(max_val, max_val, min_val, 1, -1)
+    middle = normalize(-48.5, max_val, min_val, 1, -1)
 
-print(f"Normalized Minimum value: {min_value}")
-print(f"Normalized middle value: {middle}")
-print(f"Normalized Maximum value: {max_value}")
+    print(f"Normalized Minimum value: {min_value}")
+    print(f"Normalized middle value: {middle}")
+    print(f"Normalized Maximum value: {max_value}")
