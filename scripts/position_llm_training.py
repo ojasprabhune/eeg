@@ -4,7 +4,6 @@ from torch.utils.data import DataLoader
 import numpy as np
 import matplotlib.pyplot as plt
 
-from eeg.data_collection.utils import normalize
 from eeg.position_llm.data import DeltaData
 
 training_data = DeltaData("/home/prabhune/projects/research/2026/eeg/data/test.npy")
@@ -25,10 +24,6 @@ max_delta = torch.max(train_features_deltas)
 min_delta = torch.min(train_features_deltas)
 print("max", max_delta.item())
 print("min", min_delta.item())
-
-# train_features_deltas = normalize(
-#     train_features_deltas, max_delta.item(), min_delta.item(), 1, -1
-# )
 
 
 train_features_deltas = torch.trunc(train_features_deltas * 10) / 10
