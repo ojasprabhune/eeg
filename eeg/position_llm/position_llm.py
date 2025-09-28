@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 
-from transformer.attention import FeedForwardNN, MultiHeadAttention
-from transformer.encoder import PositionalEncoding
+from .transformer.attention import FeedForwardNN, MultiHeadAttention
+from .transformer.encoder import PositionalEncoding
 
 
 class PositionLLMLayer(nn.Module):
@@ -95,6 +95,7 @@ class PositionLLM(nn.Module):
                 for _ in range(num_layers)
             ]
         )
+        self.linear = nn.Linear(embedding_dim, vocab_size)
         self.positional_encoding = PositionalEncoding(
             embedding_dim, dropout, max_length
         )
@@ -102,11 +103,15 @@ class PositionLLM(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         sequence_embedding = self.embedding(x)  # (B, T, C)
+        # print(f"emb shape: {sequence_embedding.shape}")
         x = self.positional_encoding(sequence_embedding)  # add positional information
+        # print(f"posenc shape: {x.shape}")
         x = self.dropout(x)
 
         # process data on layers
         for positionllm_layer in self.positionllm_layers:
             x = positionllm_layer(x)
+
+        x = self.linear(x)
 
         return x
