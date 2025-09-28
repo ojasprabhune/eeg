@@ -27,7 +27,6 @@ class DeltaDataset(Dataset):
         )
         self.data = self.data.round(decimals=1)
         print(self.data.min(), self.data.max())
-        self.tokenizer = DeltaTokenizer()
 
         # deltas will be a list of delta sequences, each with shape (64,)
         self.deltas = []
