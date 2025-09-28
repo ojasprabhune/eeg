@@ -1,4 +1,4 @@
-from eeg.position_llm import DeltaTokenizer, DeltaDataset, PositionLLM
+from eeg.overfit.position_llm import DeltaTokenizer, DeltaDataset, PositionLLM
 
 from tqdm import tqdm
 import torch
