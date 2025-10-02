@@ -4,24 +4,34 @@ import torch
 from torch.nn import CrossEntropyLoss
 from torch.optim import Adam
 from tqdm import tqdm
+from sklearn.preprocessing import StandardScaler
 
-from eeg.region_token.position_llm import PositionLLM, RegionTokenizer
+from eeg.region_token.position_llm import PositionLLM, RegionTokenizer, DeltaTokenizer
+from eeg.region_token.data_collection.utils import normalize
 
 matplotlib.use("module://matplotlib-backend-wezterm")  # needed for WSL matplib display
 import matplotlib.pyplot as plt
 
-# use KMeans trained model on delta tokens
-tokenizer = RegionTokenizer("models/delta_tokens")
-data = np.load("data/open_fist_front.npy")
-data = np.diff(data, axis=0)
+# use trained KMeans model on delta tokens
+region_tokenizer = RegionTokenizer("models/delta_tokens")
+delta_tokenizer = DeltaTokenizer()  # delta tokenizer
+scaler = region_tokenizer.scaler
 
-region_tokens = tokenizer.encode(torch.tensor(data, dtype=torch.float64))[
-    :64
-]  # (1472,)
+data = np.load("data/open_fist_front.npy")  # load file
+data = scaler.transform(data)  # standardize before processing
+deltas = np.diff(data, axis=0)  # difference between time steps
+deltas = normalize(deltas, deltas.max(), deltas.min(), 20, -20)  # crunch
+deltas = np.round(deltas, decimals=1)  # round to tenths
+
+delta_tokens = delta_tokenizer.encode(deltas)  # deltas -> tokens
+print("deltatokens", delta_tokens[0])
+region_tokens = region_tokenizer.encode(delta_tokens)[:64]  # (1472,)
+print("regionstokens", region_tokens)
 print("region_tokens:", region_tokens.shape)
 
 model = PositionLLM(
-    vocab_size=len(tokenizer.region_centers),
+    # vocab size is amount of regions
+    vocab_size=len(region_tokenizer.region_centers),
     num_layers=1,
     num_heads=1,
     embedding_dim=64,
@@ -69,7 +79,7 @@ def inference(model: torch.nn.Module) -> torch.Tensor:
     first_token = in_tokens[:, 0]
     tokens_so_far = [first_token.item()]
 
-    for i in range(128):
+    for i in range(64):
         input_tokens = torch.tensor(tokens_so_far)
         input_tokens = input_tokens.unsqueeze(dim=0)
 

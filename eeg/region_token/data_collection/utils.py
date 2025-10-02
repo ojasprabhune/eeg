@@ -2,6 +2,13 @@ import numpy as np
 import os
 
 
+def process_deltas(data: np.ndarray) -> np.ndarray:
+    deltas = np.diff(data, axis=0)  # deltas
+    norm_deltas = normalize(deltas, deltas.max(), deltas.min(), 20, -20)
+    round_data = norm_deltas.round(decimals=1)
+    return round_data
+
+
 def normalize(
     value,
     old_max: float,

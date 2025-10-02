@@ -5,8 +5,8 @@ import torch
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 
-from eeg.overfit.data_collection.utils import normalize
-from eeg.overfit.position_llm import DeltaTokenizer
+from eeg.region_token.data_collection.utils import normalize, process_deltas
+from eeg.region_token.position_llm import DeltaTokenizer
 
 
 def load_data(data_file: str) -> np.ndarray:
@@ -20,7 +20,7 @@ def load_data(data_file: str) -> np.ndarray:
 
 
 def preprocess_data(
-    data: np.ndarray, diff: bool, show: bool = False
+    data: np.ndarray, show: bool = False
 ) -> tuple[np.ndarray, StandardScaler]:
     """
     Preprocess our data using normalization and other techniques so that
@@ -32,48 +32,21 @@ def preprocess_data(
     """
 
     scaler: StandardScaler = StandardScaler()
-    scaler_data: np.ndarray = scaler.fit_transform(data)  # still (T, 63)
-
-    print("Scaled data:", scaler_data.shape)
-
-    delta_data = np.diff(scaler_data, axis=0)  # deltas
-
-    print("Delta data:", delta_data.shape)
-
-    print("Min:", delta_data.min(), "Max:", delta_data.max())
-
-    norm_data = normalize(
-        delta_data, delta_data.max(), delta_data.min(), 10, -10
-    )  # normalize
-
-    print("Norm data:", norm_data.shape)
-
-    round_data = norm_data.round(decimals=1)
-
     delta_tokenizer = DeltaTokenizer()
-    delta_tokens = delta_tokenizer.encode(
-        torch.Tensor(round_data)
-    )  # encode deltas into delta tokens
+
+    scaler_data: np.ndarray = scaler.fit_transform(data)  # still (T, 63)
+    round_data = process_deltas(scaler_data)
+    delta_tokens = delta_tokenizer.encode(round_data)
+    # encode deltas into delta tokens ^
 
     print("Delta tokens:", delta_tokens.shape)
-
-    if show:
-        plt.hist(
-            delta_tokens[:, 24],
-            bins=40,
-            alpha=0.7,
-            color="skyblue",
-            edgecolor="black",
-            density=True,
-        )
-        plt.show()
 
     return delta_tokens, scaler
 
 
-def kmeans(save_location: str, data_file: str, diff: bool) -> None:
+def kmeans(save_location: str, data_file: str) -> None:
     data = load_data(data_file)  # get file
-    data, scaler = preprocess_data(data, diff)  # preprocess it and data and scaler
+    data, scaler = preprocess_data(data)  # preprocess it and data and scaler
 
     # init is method of initializing clusters. n_init means it runs
     # KMeans 20 times with different initial clusters. n_clusters
