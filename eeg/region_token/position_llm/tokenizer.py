@@ -1,17 +1,15 @@
 import joblib
-
-import torch
 import numpy as np
-
-from sklearn.preprocessing import StandardScaler
+import torch
 from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
 
 
 class Tokenizer:
-    def encode(self, data: torch.Tensor):
+    def encode(self, data: torch.Tensor) -> torch.Tensor:
         pass
 
-    def decode(self, data: torch.Tensor):
+    def decode(self, data: torch.Tensor) -> torch.Tensor:
         pass
 
 
@@ -55,6 +53,11 @@ class DeltaTokenizer(Tokenizer):
 
 
 class RegionTokenizer(Tokenizer):
+    """
+    RegionTokenizer uses a trained and scaled KMeans model
+    on raw position values to produce 50 clusters.
+    """
+
     def __init__(self, model_location: str):
         self.scaler: StandardScaler = joblib.load(
             f"{model_location}/kmeans_scaler.joblib"
@@ -64,7 +67,7 @@ class RegionTokenizer(Tokenizer):
 
     def encode(self, data: torch.Tensor) -> torch.Tensor:
         # normalize data
-        scaled_data = self.scaler.transform(data.numpy())
+        scaled_data = self.scaler.transform(data.float().numpy())
         regions = self.kmeans.predict(scaled_data)
 
         return torch.tensor(regions)

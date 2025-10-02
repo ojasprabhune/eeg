@@ -1,32 +1,45 @@
-from eeg.overfit.position_llm import DeltaTokenizer, DeltaDataset, PositionLLM
-
-from tqdm import tqdm
+import matplotlib
+import numpy as np
 import torch
-from torch.optim import Adam
 from torch.nn import CrossEntropyLoss
+from torch.optim import Adam
+from tqdm import tqdm
 
+from eeg.region_token.position_llm import PositionLLM, RegionTokenizer
+
+matplotlib.use("module://matplotlib-backend-wezterm")  # needed for WSL matplib display
 import matplotlib.pyplot as plt
 
-tokenizer = DeltaTokenizer()
-dataset = DeltaDataset(data_file="data/open_fist_front.npy")
+# use KMeans trained model on delta tokens
+tokenizer = RegionTokenizer("models/delta_tokens")
+data = np.load("data/open_fist_front.npy")
+data = np.diff(data, axis=0)
+
+region_tokens = tokenizer.encode(torch.tensor(data, dtype=torch.float64))[
+    :64
+]  # (1472,)
+print("region_tokens:", region_tokens.shape)
+
 model = PositionLLM(
-    vocab_size=len(tokenizer.mapping),
+    vocab_size=len(tokenizer.region_centers),
     num_layers=1,
     num_heads=1,
     embedding_dim=64,
     ffn_hidden_dim=64,
     qk_length=64,
     value_length=64,
-    max_length=1024,
+    max_length=2048,
     dropout=0.1,
 )
+
 optimizer = Adam(model.parameters(), lr=1e-3, betas=(0.9, 0.999))
 loss_fn = CrossEntropyLoss()
 
-# dataset[0] gives shape (64,)
-in_tokens = tokenizer.encode(dataset[0])
-# adds an empty dimension at the start so the shape looks like (1, 64)
-in_tokens = in_tokens.unsqueeze(dim=0)
+# adds an empty dimension at the start so the shape looks like (1, 1472)
+in_tokens = region_tokens.unsqueeze(dim=0).to(
+    dtype=torch.int64
+)  # why ????????????????????????????????
+print("region_tokens unsqueezed:", in_tokens.shape)
 
 
 def train():
@@ -56,7 +69,7 @@ def inference(model: torch.nn.Module) -> torch.Tensor:
     first_token = in_tokens[:, 0]
     tokens_so_far = [first_token.item()]
 
-    for i in range(64):
+    for i in range(128):
         input_tokens = torch.tensor(tokens_so_far)
         input_tokens = input_tokens.unsqueeze(dim=0)
 
