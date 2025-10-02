@@ -1,40 +1,28 @@
-from .tokenizer import DeltaTokenizer
-from ..data_collection.utils import normalize
-
 import numpy as np
 
 import torch
 from torch.utils.data import Dataset
 
+from eeg.region_token.position_llm import RegionTokenizer
 
-class DeltaDataset(Dataset):
+
+class RegionDataset(Dataset):
     def __init__(self, data_file: str) -> None:
         """
-        Only using 24 for index finger tip positions.
+        RegionDataset loading batches for tokenized deltas.
         """
-        super().__init__()
-        self.original_data: np.ndarray = np.load(data_file)[
-            :, 24
-        ]  # shape: (total_T, 63) => (total_T,)
-        self.original_data = np.diff(self.original_data, axis=0)
-        print(self.original_data.min(), self.original_data.max())
-        self.data: np.ndarray = normalize(
-            self.original_data,
-            self.original_data.max(),
+        super().__init__()  # initialize super class Dataset (from torch)
+        # load original raw position values from npy file
+        self.original_data: np.ndarray = np.load(data_file)  # (T, 63)
+        # find difference downward
+        self.original_data = np.diff(self.original_data, axis=0)  # (T, 63)
+
+        print(
+            "Delta minimum:",
             self.original_data.min(),
-            10,
-            -10,
+            "\nDelta maximum:",
+            self.original_data.max(),
         )
-        self.data = self.data.round(decimals=1)
-        print(self.data.min(), self.data.max())
-
-        # deltas will be a list of delta sequences, each with shape (64,)
-        self.deltas = []
-
-        # start at 0, go up to len(self.data), and step by 64
-        for i in range(0, len(self.data), 64):
-            delta = self.data[i : i + 64]  # shape: (64,)
-            self.deltas.append(delta)
 
     def __len__(self):
         return len(self.deltas)

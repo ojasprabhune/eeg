@@ -1,5 +1,6 @@
 import numpy as np
 import os
+import torch
 
 
 def normalize(
@@ -8,7 +9,7 @@ def normalize(
     old_min: float,
     new_max: float,
     new_min: float,
-):
+) -> torch.Tensor:
     """
     Converts a number range to another range while maintaining ratio.
     """

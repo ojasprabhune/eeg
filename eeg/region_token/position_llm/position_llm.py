@@ -56,7 +56,7 @@ class PositionLLMLayer(nn.Module):
 class PositionLLM(nn.Module):
     def __init__(
         self,
-        vocab_size: int,  # 21 values: range of deltas [-1, -0.9, -0.8, ... 0.8, 0.9, 1]
+        vocab_size: int,
         num_layers: int,
         num_heads: int,
         embedding_dim: int,
