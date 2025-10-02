@@ -36,23 +36,14 @@ class DeltaTokenizer(Tokenizer):
         self.mapping: list[float] = [i / 10.0 for i in range(-100, 110)]
 
     def encode(self, data: torch.Tensor) -> torch.Tensor:
-        # data is shape (T, 63)
         tokens = []
-        for time_step in data:  # time_step is shape (63)
-            time_steps = []
-            for delta in time_step:  # 63 deltas in each time step
-                # append 63 deltas to each time step
-                time_steps.append(self.mapping.index(delta))
-            tokens.append(time_steps)
+        for delta in data:
+            tokens.append(self.mapping.index(delta))
 
         return torch.tensor(tokens)
 
     def decode(self, data: torch.Tensor) -> torch.Tensor:
         deltas = []
-        for time_step in data:
-            time_steps = []
-            for token in time_step:
-                time_steps.append(self.mapping[token])
-            deltas.append(time_steps)
-
+        for token in data:
+            deltas.append(self.mapping[token])
         return torch.tensor(deltas, dtype=torch.float64)

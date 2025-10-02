@@ -11,10 +11,12 @@ class RegionDataset(Dataset):
         """
         RegionDataset loading batches for tokenized deltas.
         """
+
         super().__init__()  # initialize super class Dataset (from torch)
+
         # load original raw position values from npy file
+        # and find deltas
         self.original_data: np.ndarray = np.load(data_file)  # (T, 63)
-        # find difference downward
         self.original_data = np.diff(self.original_data, axis=0)  # (T, 63)
 
         print(

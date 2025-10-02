@@ -15,47 +15,60 @@ class Tokenizer:
 
 class DeltaTokenizer(Tokenizer):
     """
-    DeltaTokenizer converts a list of position "deltas"
-    for a single joint (x, y, OR z) into tokens. This is just
-    an example, since our full data is multidimensional
-    (i.e. we have 21 joints with x, y, and z data for each
-    => 63 columns per timestep). For the full data, we will have
-    to devise a more complicated "quantization" scheme, which will
-    take our continuous data and convert it into discrete tokens.
+    DeltaTokenizer converts sequences of position deltas (T, 63)
+    into tokens. Each delta value is mapped to a token based on
+    a predefined mapping from -10.0 to 10.0 in increments of 0.1.
+    Each time step contains 63 delta values, resulting in a
+    sequence of tokenized time steps.
 
-    E.g.:
+    E.g.
 
-    0: -10
-    1: -9
-    2: -8
+    0: -10.0
+    1: -9.9
+    2: -9.8
     ...
-    20: 10
+    200: 10.0
 
     Going from delta values to tokens:
-    [-8, -3, 4, 8, 2, 0, 5] => [2, 7, 14, 18, 12, 10, 15]
+    [[-8.0, -3.0, 4.0, ..., 0.0], ...] => [[20, 71, 140, ..., 100
     """
 
     def __init__(self):
-        self.mapping: list[float] = [i / 10.0 for i in range(-100, 110)]
+        # self.mapping: list[float] = [i / 10.0 for i in range(-100, 110)]
+        self.mapping: list[float] = [i / 10.0 for i in range(-200, 201)]
 
     def encode(self, data: torch.Tensor) -> torch.Tensor:
+        # data is shape (T, 63)
         tokens = []
-        for delta in data:
-            tokens.append(self.mapping.index(delta))
+        for time_step in data:  # time_step is shape (63)
+            time_steps = []
+            for delta in time_step:  # 63 deltas in each time step
+                # append 63 deltas to each time step
+                time_steps.append(self.mapping.index(delta))
+            tokens.append(time_steps)
 
         return torch.tensor(tokens)
 
     def decode(self, data: torch.Tensor) -> torch.Tensor:
         deltas = []
-        for token in data:
-            deltas.append(self.mapping[token])
+        for time_step in data:
+            time_steps = []
+            for token in time_step:
+                time_steps.append(self.mapping[token])
+            deltas.append(time_steps)
+
         return torch.tensor(deltas, dtype=torch.float64)
 
 
 class RegionTokenizer(Tokenizer):
     """
     RegionTokenizer uses a trained and scaled KMeans model
-    on raw position values to produce 50 clusters.
+    on raw position values to produce 50 clusters. Each cluster
+    is a "region" in the 63-dimensional space of hand positions.
+    Each region is represented by a token (0-49). The encode
+    function converts raw position values into region tokens,
+    while the decode function converts region tokens back into
+    the center position of that region.
     """
 
     def __init__(self, model_location: str):
@@ -67,8 +80,8 @@ class RegionTokenizer(Tokenizer):
 
     def encode(self, data: torch.Tensor) -> torch.Tensor:
         # normalize data
-        scaled_data = self.scaler.transform(data.float().numpy())
-        regions = self.kmeans.predict(scaled_data)
+        # scaled_data = self.scaler.transform(data.numpy())
+        regions = self.kmeans.predict(data.numpy())
 
         return torch.tensor(regions)
 
