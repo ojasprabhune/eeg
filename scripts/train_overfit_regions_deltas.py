@@ -9,7 +9,7 @@ from sklearn.preprocessing import StandardScaler
 from eeg.region_token.position_llm import PositionLLM, RegionTokenizer, DeltaTokenizer
 from eeg.region_token.data_collection.utils import normalize
 
-matplotlib.use("module://matplotlib-backend-wezterm")  # needed for WSL matplib display
+# matplotlib.use("module://matplotlib-backend-wezterm")  # needed for WSL matplib display
 import matplotlib.pyplot as plt
 
 # use trained KMeans model on delta tokens
@@ -46,9 +46,7 @@ optimizer = Adam(model.parameters(), lr=1e-3, betas=(0.9, 0.999))
 loss_fn = CrossEntropyLoss()
 
 # adds an empty dimension at the start so the shape looks like (1, 1472)
-in_tokens = region_tokens.unsqueeze(dim=0).to(
-    dtype=torch.int64
-)  # why ????????????????????????????????
+in_tokens = region_tokens.unsqueeze(dim=0).to(dtype=torch.int64)
 print("region_tokens unsqueezed:", in_tokens.shape)
 
 
