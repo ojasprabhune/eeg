@@ -3,10 +3,9 @@ Kmeans is a unsupervised machine learning clustering
 algorithm for vector quantization. It will partition
 n observations into k clusters.
 
-This file has 3 arguments:
+This file has 2 arguments:
     1. Save location
     2. Data file location
-    3. Difference? (find deltas)
 
 We can use this file to train on any type of data.
 

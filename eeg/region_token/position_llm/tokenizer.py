@@ -34,8 +34,8 @@ class DeltaTokenizer(Tokenizer):
     """
 
     def __init__(self):
-        # self.mapping: list[float] = [i / 10.0 for i in range(-100, 110)]
-        self.mapping: list[float] = [i / 10.0 for i in range(-200, 201)]
+        self.mapping: list[float] = [i / 10.0 for i in range(-100, 110)]
+        # self.mapping: list[float] = [i / 10.0 for i in range(-200, 201)]
 
     def encode(self, data: torch.Tensor) -> torch.Tensor:
         # data is shape (T, 63)
