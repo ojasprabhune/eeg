@@ -5,7 +5,7 @@ import cv2
 import mediapipe as mp
 import numpy as np
 
-from eeg.data_collection import JointData
+from eeg.overfit.data_collection import JointData
 
 parser = argparse.ArgumentParser(
     prog="Collect data",
