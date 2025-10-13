@@ -1,19 +1,3 @@
-"""
-Kmeans is a unsupervised machine learning clustering
-algorithm for vector quantization. It will partition
-n observations into k clusters.
-
-This file has 2 arguments:
-    1. Save location
-    2. Data file location
-
-We can use this file to train on any type of data.
-
-For example, we can train it on raw position values
-and turn then into region tokens. We can also train
-KMeans on delta tokens instead.
-"""
-
 import argparse
 
 from eeg.region_token.cluster.kmeans import kmeans
