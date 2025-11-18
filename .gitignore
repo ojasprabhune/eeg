@@ -3,3 +3,4 @@
 .venv/
 win_venv/
 .git/
+**wandb/
