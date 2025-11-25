@@ -6,6 +6,11 @@ from .transformer.encoder import PositionalEncoding
 
 
 class PositionLLMLayer(nn.Module):
+    """
+    Essentially equivalent to a DecoderLayer without cross-attention
+    since we are just doing next-token prediction on k-means regions.
+    """
+
     def __init__(
         self,
         num_heads: int,
@@ -54,6 +59,10 @@ class PositionLLMLayer(nn.Module):
 
 
 class PositionLLM(nn.Module):
+    """
+    Essentially a TransformerDecoder without cross-attention.
+    """
+
     def __init__(
         self,
         vocab_size: int,

@@ -24,8 +24,7 @@ class RegionDataset(Dataset):
             (0, 63)
         )  # initialize with 0 rows and 63 channels
 
-        os.chdir(data_path)
-        for npy_file in glob.glob("*.npy"):
+        for npy_file in glob.glob(f"{data_path}/*.npy"):
             # append data from each npy file in data path downwards (by row)
             self.original_data = np.append(
                 self.original_data, np.load(npy_file), axis=0
@@ -35,8 +34,14 @@ class RegionDataset(Dataset):
         self.delta_tokens: torch.Tensor = self.delta_tokenizer.encode(
             self.deltas
         )  # (T, 63)
+
+        scaler_data: np.ndarray = self.region_tokenizer.scaler.transform(
+            self.original_data
+        )  # still (T, 63)
+        round_data = process_deltas(scaler_data)
+        delta_tokens = self.delta_tokenizer.encode(round_data)
         self.region_tokens: torch.Tensor = self.region_tokenizer.encode(
-            self.delta_tokens
+            delta_tokens
         )  # (T,)
 
         # regions will be a list of region sequences, each with shape (64,)
