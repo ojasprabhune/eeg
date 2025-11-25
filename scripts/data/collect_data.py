@@ -24,18 +24,22 @@ parser.add_argument(
 parser.add_argument(
     "--plot", type=bool, default=False, help="Plots the results if True"
 )
-parser.add_argument("--joint", type=str, default="W", help="Joint data to plot")
+parser.add_argument("--joint", type=str, default="W",
+                    help="Joint data to plot")
+
 args = parser.parse_args()
 
 # each joint is a landmark
 mp_drawing = mp.solutions.drawing_utils  # helps draw landmarks on screen
+mp_drawing_styles = mp.solutions.drawing_styles  # drawings are colorful
 mp_hands = mp.solutions.hands  # hands model
 
-joint_data = []  # initialize list of frames with landmarks
+joint_data_world = []  # initialize list of frames with world landmarks
+joint_data_norm = []  # initialize list of frames with norm landmarks
 filename = args.filename
 
 
-def hand_detection(mp_hands, mp_drawing, joint_data: list, set_fps: int):
+def hand_detection(mp_hands, mp_drawing, joint_data_world: list, joint_data_norm: list, set_fps: int):
     # getting camera / webcam (0, 1, 2 for connected webcams)
     cap = cv2.VideoCapture(0)
 
@@ -69,7 +73,8 @@ def hand_detection(mp_hands, mp_drawing, joint_data: list, set_fps: int):
             # a return value and image from webcame
             success, frame = cap.read()
             # initialize list for current frame data
-            frame_data = []
+            frame_data_world = []
+            frame_data_norm = []
 
             if not success:
                 print("Ignoring empty camera frame.")
@@ -79,9 +84,10 @@ def hand_detection(mp_hands, mp_drawing, joint_data: list, set_fps: int):
             # to improve performance, optionally mark the image as not writeable to
             # pass by reference.
             frame.flags.writeable = False
-            frame = cv2.cvtColor(
-                frame, cv2.COLOR_BGR2RGB
-            )  # model requires 3 channel RGB
+
+            # model requires 3 channel RGB
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
             results = hands.process(frame)
 
             # set flag back to true
@@ -89,39 +95,31 @@ def hand_detection(mp_hands, mp_drawing, joint_data: list, set_fps: int):
             frame.flags.writeable = True
             frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
-            image_height, image_width, _ = frame.shape
-
-            # if solution has landmarks then render results on image
             if results.multi_hand_landmarks:
-                # iterate through each landmark
-                # hand_landmarks represents the landmarks for that hand
-                for hand_landmarks in results.multi_hand_landmarks:
-                    # pass in three variables:
-                    # 1. image
-                    # 2. hand (set of landmarks)
-                    # 3. HAND_CONNECTIONS represents the set of coordinates of relations between joints
-                    mp_drawing.draw_landmarks(
-                        frame, hand_landmarks, mp_hands.HAND_CONNECTIONS
-                    )
+                mp_drawing.draw_landmarks(
+                    frame, results.multi_hand_landmarks[0], mp_hands.HAND_CONNECTIONS,
+                    mp_drawing_styles.get_default_hand_landmarks_style(),
+                    mp_drawing_styles.get_default_hand_connections_style()
+                )
 
-                    # iterate through hand landmarks list and figure out the position
-                    # openCV origin is top left (e.g., y position increases when wrist moves down)
-                    for landmark in hand_landmarks.landmark:
-                        W = hand_landmarks.landmark[0]
-                        relative_x = landmark.x - W.x
-                        relative_y = landmark.y - W.y
-                        relative_z = landmark.z - W.z
-                        # extend list by new landmark positions
-                        frame_data.extend(
-                            [
-                                relative_x * image_width,
-                                relative_y * image_height,
-                                relative_z * image_width,
-                            ]
-                        )
+                # metric
+                hand_landmarks = results.multi_hand_world_landmarks[0]
 
-                # add to data
-                joint_data.append(frame_data)
+                # normalized
+                hand_landmarks_norm = results.multi_hand_landmarks[0]
+
+                # extend lists by new landmark positions
+                for world_landmark in hand_landmarks.landmark:
+                    frame_data_world.extend(
+                        [world_landmark.x, world_landmark.y, world_landmark.z])
+
+                for norm_landmark in hand_landmarks_norm.landmark:
+                    frame_data_norm.extend(
+                        [norm_landmark.x, norm_landmark.y, norm_landmark.z])
+
+                # add time step to data
+                joint_data_world.append(frame_data_world)
+                joint_data_norm.append(frame_data_norm)
 
             # render image to screen using OpenCV with "Hand tracking" window title
             cv2.imshow("Hand tracking", frame)
@@ -143,13 +141,16 @@ def hand_detection(mp_hands, mp_drawing, joint_data: list, set_fps: int):
 
 
 def write(data: list, filename: str):
-    dataset = np.array(data)  # turn list into numpy array
+    dataset = np.array(data)  # turn lists into numpy array
     np.save(f"data/{filename}.npy", dataset)  # save numpy array
 
 
-hand_detection(mp_hands, mp_drawing, joint_data, 30)
-write(joint_data, filename)
+hand_detection(mp_hands, mp_drawing, joint_data_world, joint_data_norm, 30)
+write([joint_data_world, joint_data_norm], filename)
 
 data = JointData(f"data/{filename}.npy")
 if args.plot:
-    data.plot_data(args.joint)
+    if args.joint is not None:
+        data.plot_data(args.joint)
+    else:
+        print("Error: No joint given to plot.")

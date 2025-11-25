@@ -1,0 +1,21 @@
+{
+    "url": "https://cad.onshape.com/documents/430ff184cf3dd9557aaff2be/w/e3658b7152c139971d22c688/e/a30f3af671aa926642803c67",
+    "output_format": "mujoco",
+
+    "ignore": {
+    "*": "collision"
+    },
+
+    "freejoint": false,
+
+    "additional_xml": ["joints_properties.xml", "additional.xml"],
+
+    "joint_properties": {
+        "passive*": {"actuated": false},
+        "motor*": {
+          "class": "chosen_actuator"
+        }
+    }
+
+
+}

@@ -2,7 +2,10 @@
 
 ### `collect_data.py`
 
-Collects hand pose estimation data for XYZ position data for 21 joints on a hand, stored in an .npy file. The .npy file will contains T (number of frames) rows and 63 columns (channels) for each joint.
+Collects hand pose estimation data for XYZ position data for 21 joints on a hand, stored in an .npy file. The .npy file is 2xTx63, where:
+- One batch has world data and one batch has normalized data.
+- T is the number of frames; rows.
+- There are 63 columns (channels) for each joint.
 
 #### Arguments
 
