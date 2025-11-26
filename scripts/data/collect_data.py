@@ -37,9 +37,12 @@ mp_hands = mp.solutions.hands  # hands model
 joint_data_world = []  # initialize list of frames with world landmarks
 joint_data_norm = []  # initialize list of frames with norm landmarks
 filename = args.filename
+num_frames = args.data_time * 30
 
 
 def hand_detection(mp_hands, mp_drawing, joint_data_world: list, joint_data_norm: list, set_fps: int):
+    cur_frame = 1
+
     # getting camera / webcam (0, 1, 2 for connected webcams)
     cap = cv2.VideoCapture(0)
 
@@ -120,6 +123,7 @@ def hand_detection(mp_hands, mp_drawing, joint_data_world: list, joint_data_norm
                 # add time step to data
                 joint_data_world.append(frame_data_world)
                 joint_data_norm.append(frame_data_norm)
+                cur_frame += 1
 
             # render image to screen using OpenCV with "Hand tracking" window title
             cv2.imshow("Hand tracking", frame)
@@ -131,7 +135,7 @@ def hand_detection(mp_hands, mp_drawing, joint_data_world: list, joint_data_norm
             if cv2.waitKey(10) & 0xFF == ord("q"):
                 break
 
-            if time.time() > data_time:
+            if cur_frame > num_frames:
                 break
 
     # release webcam

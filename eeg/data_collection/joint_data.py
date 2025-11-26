@@ -4,14 +4,25 @@ import matplotlib.pyplot as plt
 
 from .joints import Joint
 
+
 class DataType(Enum):
     WORLD = 0
     NORM = 1
 
+
 class JointData:
-    def __init__(self, file_path: str):
-        self.file_path = file_path  # set file path
-        self.data = np.load(self.file_path)  # read file from file path
+    def __init__(self, data: str | np.ndarray):
+        """
+        Arguments:
+            data (str, np.ndarray): A file path to an .npy data file or a numpy
+            array that is size (2, T, 63).
+        """
+        if isinstance(data, str):
+            self.file_path = data  # set file path
+            self.data = np.load(self.file_path)  # read file from file path
+
+        if isinstance(data, np.ndarray):
+            self.data = data
 
     # get function to obtain positions for a landmark
     def get_positions(self, data_type: DataType, joint: str | Joint, component: str = None) -> np.ndarray:
@@ -24,7 +35,7 @@ class JointData:
         start = index * 3  # one per component
 
         if component is None:
-            positions = self.data[data_type.value][:, start : start + 3]
+            positions = self.data[data_type.value][:, start: start + 3]
         elif component == "x":
             positions = self.data[data_type.value][:, start]
         elif component == "y":
@@ -56,9 +67,12 @@ class JointData:
 
         time = np.linspace(0, len(x_data), len(x_data))
 
-        plot(time, x_data, ax[0, 0], "Time (frames)", "Expected relative X position")
-        plot(time, y_data, ax[1, 0], "Time (frames)", "Expected relative Y position")
-        plot(time, z_data, ax[2, 0], "Time (frames)", "Expected relative Z position")
+        plot(time, x_data, ax[0, 0], "Time (frames)",
+             "Expected relative X position")
+        plot(time, y_data, ax[1, 0], "Time (frames)",
+             "Expected relative Y position")
+        plot(time, z_data, ax[2, 0], "Time (frames)",
+             "Expected relative Z position")
         # axis=0 in order to unpack sublists and differentiate between single values
         plot(
             np.delete(time, -1),
@@ -124,4 +138,3 @@ class JointData:
         ax[2].set_ylabel("Z position")
 
         plt.show()
-

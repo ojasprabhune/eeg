@@ -26,7 +26,7 @@ def process_input(joint_data: JointData, time_step: int):
     unit_y = np.cross(unit_z, unit_x)
 
     # rotational matrix for linear transformation
-    R: np.ndarray = np.array([unit_x, -unit_y, unit_z]).reshape((3, 3))
+    R: np.ndarray = np.array([-unit_x, -unit_y, unit_z]).reshape((3, 3))
 
     def change_of_basis(tip_idx: Joint, mcp_idx: Joint) -> np.ndarray:
         v = joint_data.get_positions(DataType.WORLD, tip_idx)[time_step] - \

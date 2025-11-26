@@ -1,6 +1,57 @@
 import numpy as np
 import os
 
+from eeg.data_collection import JointData, Joint, DataType
+
+
+def appendages(joint_data: JointData) -> np.ndarray:
+    """
+    Uses joint data to calculate appendage vectors and
+    unit vectors to perform change of basis and return
+    an numpy array of size (T, 12).
+    """
+    origin = joint_data.get_positions(DataType.NORM, Joint.W)
+    mid_mcp = joint_data.get_positions(DataType.NORM, Joint.MM)
+    pinky_mcp = joint_data.get_positions(DataType.NORM, Joint.PM)
+
+    # unit vectors shapes: (T, 3)
+
+    unit_z = mid_mcp - origin  # vector from wrist to mid_mcp
+    # divide by magnitude (becomes unit vector)
+    unit_z /= np.linalg.norm(unit_z)
+
+    vec_y = pinky_mcp - origin
+    unit_x = np.cross(vec_y, unit_z)  # perpendicular
+    unit_x /= np.linalg.norm(unit_x)
+
+    unit_y = np.cross(unit_z, unit_x)
+
+    # rotational matrix for linear transformation with time steps
+    # (3, 3, T)
+    R: np.ndarray = np.array([-unit_x, -unit_y, unit_z]
+                             ).reshape((3, 3, joint_data.get_dataset().shape[1]))
+
+    R = R.transpose(2, 0, 1)  # (3, 3, T) -> (T, 3, 3)
+
+    def change_of_basis(tip_idx: Joint, mcp_idx: Joint) -> np.ndarray:
+        v = joint_data.get_positions(DataType.WORLD, tip_idx) - \
+            joint_data.get_positions(DataType.WORLD, mcp_idx)  # (T, 3)
+
+        out = R @ v[:, :, None]
+        return out[:, :, 0]
+
+    # appendage vectors should be (T, 3)
+
+    index = change_of_basis(Joint.IT, Joint.IM)
+    middle = change_of_basis(Joint.MT, Joint.MM)
+    ring = change_of_basis(Joint.RT, Joint.RM)
+    thumb = change_of_basis(Joint.TT, Joint.TM)
+
+    # concats 4 fingers' 3 vector components horizontally, retaining time
+    result = np.concatenate([index, middle, ring, thumb], axis=1)  # (T, 12)
+
+    return result
+
 
 def process_deltas(data: np.ndarray) -> np.ndarray:
     deltas = np.diff(data, axis=0)  # deltas
@@ -63,7 +114,8 @@ def min_max_npy(directory_path):
 
 if __name__ == "__main__":
     # example usage:
-    directory = "/home/prabhune/projects/research/2026/eeg/data/"  # Replace with the actual path to your directory
+    # Replace with the actual path to your directory
+    directory = "/home/prabhune/projects/research/2026/eeg/data/"
     min_val, max_val = min_max_npy(directory)
 
     print(f"Minimum value: {min_val}")

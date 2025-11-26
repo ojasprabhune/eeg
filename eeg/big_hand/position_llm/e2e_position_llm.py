@@ -21,7 +21,8 @@ class E2EPositionLLM(nn.Module):
             dropout=0.1,
         )
 
-        self.linear = nn.Linear(50, 63 * 210)
+        # predict appendage vectors based on regions
+        self.linear = nn.Linear(50, 12)
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Needs to have shape (B, T)"""
@@ -31,7 +32,8 @@ class E2EPositionLLM(nn.Module):
         # expected: (T, 50)
         region_logits = self.position_llm(region_tokens)
 
-        compact_delta_logits = self.linear(region_logits)  # expected: (T, 63 * 210)
+        compact_delta_logits = self.linear(
+            region_logits)  # expected: (T, 63 * 210)
 
         # expected: (T, 63, 210)
         delta_logits = torch.reshape(compact_delta_logits, (B, T, 63, 210))

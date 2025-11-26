@@ -1,6 +1,6 @@
 """
 Train a Position LLM to generalize to Ojas's hand movements. Implement all
-previous techn
+previous techniques like region tokenization on appendage vector components.
 
 TODO:
     - hyperparameter tuning
@@ -15,17 +15,24 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
-from eeg.big_hand.position_llm import E2EPositionLLM, RegionDataset
+from eeg.big_hand.position_llm import E2EPositionLLM, RegionDataset, AppendageDataset
 
 # import region data set to iterate over batches
-region_dataset: RegionDataset = RegionDataset("data/relative_old/", seq_len=100)
+# region_dataset: RegionDataset = RegionDataset(
+#     "data/relative_old/", seq_len=100)
+appendage_dataset: AppendageDataset = AppendageDataset("data")
 
-region_dataloader = DataLoader(region_dataset, batch_size=16, shuffle=True)
+# region_dataloader = DataLoader(region_dataset, batch_size=16, shuffle=True)
+appendage_dataloader = DataLoader(
+    appendage_dataset, batch_size=16, shuffle=True)
 
 # verify resulted and expected shapes
-print(f"Raw positions shape: {region_dataset.original_data.shape}, expected: (T, 63)")
-print(f"Delta tokens shape: {region_dataset.delta_tokens.shape}, expected: (T, 63)")
-print(f"Region tokens shape: {region_dataset.region_tokens.shape}, expected: (T,)")
+print(
+    f"Raw positions shape: {appendage_dataset.train_data.shape}, expected: (2, T, 63)")
+print(
+    f"Appendage data shape: {appendage_dataset.app_data.shape}, expected: (T, 12)")
+print(
+    f"Region tokens shape: {appendage_dataset.region_tokens.shape}, expected: (T)")
 
 warmup_steps = 4000
 base_lr = 5e-5
@@ -67,7 +74,7 @@ run = wandb.init(
 def train():
     model.to(device)
     for i in range(epochs):
-        iter_tqdm = tqdm(region_dataloader)
+        iter_tqdm = tqdm(appendage_dataloader)
         for region_batch, delta_batch in iter_tqdm:
             in_region_tokens = (
                 region_batch[:, :-1].to(torch.int64).to(device)
@@ -98,7 +105,8 @@ def train():
                 delta_logits_channel = delta_logits_channel.transpose(1, 2)
 
                 # find loss for each channel
-                delta_loss = loss_fn(delta_logits_channel, gt_delta_tokens_channel)
+                delta_loss = loss_fn(delta_logits_channel,
+                                     gt_delta_tokens_channel)
 
                 # add to total
                 total_delta_loss += delta_loss
