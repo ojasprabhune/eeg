@@ -46,7 +46,8 @@ class AppendageDataset(Dataset):
         self.app_data = appendages(train_data_joints)  # (T, 12)
 
         self.region_tokens = self.region_tokenizer.encode(
-            torch.tensor(self.app_data))  # (T,)
+            torch.tensor(self.app_data)
+        )  # (T,)
 
         # regions will be a list of region sequences, each with shape (64,)
         self.regions = []
@@ -54,16 +55,12 @@ class AppendageDataset(Dataset):
 
         # start at 0, go up to len(self.regions), and step by seq_len (30 seconds of data)
         for i in range(0, len(self.region_tokens), seq_len):
-            region = self.region_tokens[i: i + seq_len]  # shape: (seq_len,)
-            # all regions are length seq_len
-            if len(region) == seq_len:
-                self.regions.append(region)
+            region = self.region_tokens[i : i + seq_len]  # shape: (seq_len,)
+            appendage = self.app_data[i : i + seq_len]  # shape: (seq_len,)
 
-        # start at 0, go up to len(self.appendages), and step by seq_len (30 seconds of data)
-        for i in range(0, len(self.appendages), seq_len):
-            appendage = self.appendages[i: i + seq_len]  # shape: (seq_len,)
-            # all deltas are length seq_len
-            if len(appendage) == seq_len:
+            # all regions are length seq_len
+            if len(region) == seq_len and len(appendage) == seq_len:  # redundant
+                self.regions.append(region)
                 self.appendages.append(appendage)
 
     def __len__(self) -> int:

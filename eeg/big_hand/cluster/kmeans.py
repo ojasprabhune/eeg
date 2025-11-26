@@ -39,6 +39,7 @@ def preprocess_data(
 
 def kmeans(save_location: str, data_file: str) -> None:
     # find appendages for data and scaler
+
     data, scaler = preprocess_data(data_file)
 
     # init is method of initializing clusters. n_init means it runs

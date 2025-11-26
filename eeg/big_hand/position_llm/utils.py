@@ -27,18 +27,17 @@ def appendages(joint_data: JointData) -> np.ndarray:
     unit_y = np.cross(unit_z, unit_x)
 
     # rotational matrix for linear transformation with time steps
-    # (3, 3, T)
-    R: np.ndarray = np.array([-unit_x, -unit_y, unit_z]
-                             ).reshape((3, 3, joint_data.get_dataset().shape[1]))
+    # (3, T, 3)
+    R: np.ndarray = np.array([-unit_x, -unit_y, unit_z])
 
-    R = R.transpose(2, 0, 1)  # (3, 3, T) -> (T, 3, 3)
+    R = R.transpose(1, 0, 2)  # (3, T, 3) -> (T, 3, 3)
 
     def change_of_basis(tip_idx: Joint, mcp_idx: Joint) -> np.ndarray:
-        v = joint_data.get_positions(DataType.WORLD, tip_idx) - \
-            joint_data.get_positions(DataType.WORLD, mcp_idx)  # (T, 3)
+        v = joint_data.get_positions(
+            DataType.WORLD, tip_idx
+        ) - joint_data.get_positions(DataType.WORLD, mcp_idx)  # (T, 3)
 
-        out = R @ v[:, :, None]
-        return out[:, :, 0]
+        return np.einsum("tij,tj->ti", R, v)
 
     # appendage vectors should be (T, 3)
 

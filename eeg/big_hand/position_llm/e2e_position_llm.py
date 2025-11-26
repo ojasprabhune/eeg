@@ -29,13 +29,9 @@ class E2EPositionLLM(nn.Module):
         region_tokens = x
         B, T = x.shape
 
-        # expected: (T, 50)
+        # expected: (B, T, 50)
         region_logits = self.position_llm(region_tokens)
 
-        compact_delta_logits = self.linear(
-            region_logits)  # expected: (T, 63 * 210)
+        appendage_values = self.linear(region_logits)  # expected: (B, T, 12)
 
-        # expected: (T, 63, 210)
-        delta_logits = torch.reshape(compact_delta_logits, (B, T, 63, 210))
-
-        return region_logits, delta_logits
+        return region_logits, appendage_values
