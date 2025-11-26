@@ -11,8 +11,8 @@ class E2EPositionLLM(nn.Module):
         self.position_llm = PositionLLM(
             # vocab size is amount of regions
             vocab_size=50,
-            num_layers=1,
-            num_heads=1,
+            num_layers=4,
+            num_heads=4,
             embedding_dim=64,
             ffn_hidden_dim=64,
             qk_length=64,

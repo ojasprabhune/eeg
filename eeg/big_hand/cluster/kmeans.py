@@ -1,11 +1,11 @@
 import joblib
-import matplotlib.pyplot as plt
 import numpy as np
-import torch
+import glob
+
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 
-from eeg.data_collection import JointData, Joint, DataType
+from eeg.data_collection import JointData
 from ..position_llm.utils import appendages
 
 
@@ -19,15 +19,21 @@ def load_data(data_file: str) -> np.ndarray:
     return data
 
 
-def preprocess_data(
-    data_file: str, show: bool = False
-) -> tuple[np.ndarray, StandardScaler]:
+def preprocess_data(show: bool = False) -> tuple[np.ndarray, StandardScaler]:
     """
     Calculate appendage vectors over time and scale.
     """
 
+    total_data: list = []
+
+    for npy_file in glob.glob("data/*.npy"):
+        data = np.load(npy_file)
+        total_data.append(data)
+
+    data = np.concatenate(total_data, axis=1)
+
     scaler: StandardScaler = StandardScaler()
-    joint_data = JointData(data_file)
+    joint_data = JointData(data)
 
     app_data = appendages(joint_data)  # (T, 12)
     scaler_data: np.ndarray = scaler.fit_transform(app_data)  # (T, 12)
@@ -37,10 +43,9 @@ def preprocess_data(
     return scaler_data, scaler
 
 
-def kmeans(save_location: str, data_file: str) -> None:
+def kmeans(save_location: str) -> None:
     # find appendages for data and scaler
-
-    data, scaler = preprocess_data(data_file)
+    data, scaler = preprocess_data()
 
     # init is method of initializing clusters. n_init means it runs
     # KMeans 20 times with different initial clusters. n_clusters

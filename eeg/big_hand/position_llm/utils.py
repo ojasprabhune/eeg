@@ -18,11 +18,11 @@ def appendages(joint_data: JointData) -> np.ndarray:
 
     unit_z = mid_mcp - origin  # vector from wrist to mid_mcp
     # divide by magnitude (becomes unit vector)
-    unit_z /= np.linalg.norm(unit_z)
+    unit_z /= np.linalg.norm(unit_z, axis=1, keepdims=True)
 
     vec_y = pinky_mcp - origin
     unit_x = np.cross(vec_y, unit_z)  # perpendicular
-    unit_x /= np.linalg.norm(unit_x)
+    unit_x /= np.linalg.norm(unit_x, axis=1, keepdims=True)
 
     unit_y = np.cross(unit_z, unit_x)
 
@@ -37,7 +37,7 @@ def appendages(joint_data: JointData) -> np.ndarray:
             DataType.WORLD, tip_idx
         ) - joint_data.get_positions(DataType.WORLD, mcp_idx)  # (T, 3)
 
-        return np.einsum("tij,tj->ti", R, v)
+        return np.matmul(R, v[:, :, None]).squeeze(-1)
 
     # appendage vectors should be (T, 3)
 

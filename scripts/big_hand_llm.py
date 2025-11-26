@@ -15,22 +15,20 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
-from eeg.big_hand.position_llm import E2EPositionLLM, RegionDataset, AppendageDataset
+from eeg.big_hand.position_llm import E2EPositionLLM, AppendageDataset
 
-# import region data set to iterate over batches
-# region_dataset: RegionDataset = RegionDataset(
-#     "data/relative_old/", seq_len=100)
-appendage_dataset: AppendageDataset = AppendageDataset("data")
+appendage_dataset: AppendageDataset = AppendageDataset()
 
-# region_dataloader = DataLoader(region_dataset, batch_size=16, shuffle=True)
-appendage_dataloader = DataLoader(appendage_dataset, batch_size=16, shuffle=True)
+appendage_dataloader = DataLoader(
+    appendage_dataset, batch_size=2, shuffle=True)
 
-# verify resulted and expected shapes
 print(
     f"Raw positions shape: {appendage_dataset.train_data.shape}, expected: (2, T, 63)"
 )
-print(f"Appendage data shape: {appendage_dataset.app_data.shape}, expected: (T, 12)")
-print(f"Region tokens shape: {appendage_dataset.region_tokens.shape}, expected: (T)")
+print(
+    f"Appendage data shape: {appendage_dataset.app_data.shape}, expected: (T, 12)")
+print(
+    f"Region tokens shape: {appendage_dataset.region_tokens.shape}, expected: (T)")
 
 warmup_steps = 4000
 base_lr = 5e-5
@@ -45,20 +43,20 @@ def lr_lambda(step):
         return (warmup_steps**0.5) / (step**0.5)
 
 
-device = 0
-epochs = 500
+device = "cuda"
+epochs = 10000
 model = E2EPositionLLM()  # end to end position llm
 optimizer = AdamW(model.parameters(), lr=base_lr, betas=[0.9, 0.98], eps=1e-9)
 scheduler = LambdaLR(optimizer, lr_lambda=lr_lambda)
 class_loss_fn = CrossEntropyLoss()
 appendage_loss_fn = MSELoss()
-lambda_appendage_loss = 1
+lambda_appendage_loss = 5
 
 # start a new wandb run to track this script.
 run = wandb.init(
     name="big_hand_100",
     # set the wandb entity where your project will be logged (generally your team name).
-    entity="tejasprabhune-uc-berkeley-electrical-engineering-compute",
+    entity="prabhuneojas-evergreen-valley-high-school",
     # set the wandb project where this run will be logged.
     project="eeg",
     # Track hyperparameters and run metadata.
@@ -73,9 +71,11 @@ run = wandb.init(
 
 def train():
     model.to(device)
-    for i in range(epochs):
-        iter_tqdm = tqdm(appendage_dataloader)
-        for region_batch, appendage_batch in iter_tqdm:
+    iter_tqdm = tqdm(range(epochs))
+    for i in tqdm(range(epochs)):
+        iter_tqdm.set_description(f"Epoch {i + 1}")
+        # iter_tqdm = appendage_dataloader
+        for region_batch, appendage_batch in appendage_dataloader:
             in_region_tokens = (
                 region_batch[:, :-1].to(torch.int64).to(device)
             )  # (1, T-1,)
@@ -106,6 +106,10 @@ def train():
             total_loss.backward()  # calculates and adds gradients to params so optim sees
             optimizer.step()  # optim looks at gradients and steps accordingly
             scheduler.step()
+        # if i % 5000 == 0:
+        #     model.to("cpu")
+        #     plot_out(model)
+        #     model.to(device)
 
     run.finish()
     model.to("cpu")
@@ -113,7 +117,6 @@ def train():
 
 region_tokens, appendage_values = appendage_dataset[0]
 print(appendage_values)
-quit()
 
 
 def inference(model: torch.nn.Module) -> torch.Tensor:
@@ -139,57 +142,33 @@ def inference(model: torch.nn.Module) -> torch.Tensor:
     return region_tokens_so_far, appendage_values_so_far  # (T, 12)
 
 
-random_out, pred_appendage = inference(model)
+def plot_out(model):
+    out, pred_appendage = inference(model)
 
-fig, ax = plt.subplots(1, 5, figsize=(20, 10))
+    fig, ax = plt.subplots(1, 5, figsize=(12, 4))
 
-ax[0].plot(random_out[:100], label="pred")
-ax[0].plot(region_tokens[:100], label="region true")
-ax[0].legend()
+    ax[0].plot(out[:100], label="pred")
+    ax[0].plot(region_tokens[:100], label="region true")
+    ax[0].legend()
 
-ax[1].plot(pred_appendage[:100, 0], label="pred")
-ax[1].plot(appendage_values[:100, 0], label="app 0")
-ax[1].legend()
+    ax[1].plot(pred_appendage[:100, 0], label="pred")
+    ax[1].plot(appendage_values[:100, 0], label="app 0")
+    ax[1].legend()
 
-ax[2].plot(pred_appendage[:100, 4], label="pred")
-ax[2].plot(appendage_values[:100, 4], label="app 4")
-ax[2].legend()
+    ax[2].plot(pred_appendage[:100, 4], label="pred")
+    ax[2].plot(appendage_values[:100, 4], label="app 4")
+    ax[2].legend()
 
-ax[3].plot(pred_appendage[:, 7], label="pred")
-ax[3].plot(appendage_values[:, 7], label="app 7")
-ax[3].legend()
+    ax[3].plot(pred_appendage[:100, 7], label="pred")
+    ax[3].plot(appendage_values[:100, 7], label="app 7")
+    ax[3].legend()
 
-ax[4].plot(pred_appendage[:, 11], label="pred")
-ax[4].plot(appendage_values[:, 11], label="app 13")
-ax[4].legend()
+    ax[4].plot(pred_appendage[:100, 11], label="pred")
+    ax[4].plot(appendage_values[:100, 11], label="app 13")
+    ax[4].legend()
 
+    plt.show()
 
-plt.show()
 
 train()
-
-trained_out, pred_appendage = inference(model)
-
-fig, ax = plt.subplots(1, 5, figsize=(20, 10))
-
-ax[0].plot(random_out[:100], label="pred")
-ax[0].plot(region_tokens[:100], label="region true")
-ax[0].legend()
-
-ax[1].plot(pred_appendage[:100, 0], label="pred")
-ax[1].plot(appendage_values[:100, 0], label="app 0")
-ax[1].legend()
-
-ax[2].plot(pred_appendage[:100, 4], label="pred")
-ax[2].plot(appendage_values[:100, 4], label="app 4")
-ax[2].legend()
-
-ax[3].plot(pred_appendage[:100, 7], label="pred")
-ax[3].plot(appendage_values[:100, 7], label="app 7")
-ax[3].legend()
-
-ax[4].plot(pred_appendage[:100, 11], label="pred")
-ax[4].plot(appendage_values[:100, 11], label="app 13")
-ax[4].legend()
-
-plt.show()
+plot_out(model)

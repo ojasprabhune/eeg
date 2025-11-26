@@ -3,49 +3,16 @@ import pyarrow as pa
 from dora import Node
 import mediapipe as mp
 from eeg.data_collection import JointData, Joint, DataType
+from eeg.big_hand.position_llm.utils import appendages
 
 mp_hands = mp.solutions.hands
 
 
 def process_input(joint_data: JointData, time_step: int):
-    print(time_step)
-    res = None
+    result = appendages(joint_data)
 
-    origin = joint_data.get_positions(DataType.NORM, Joint.W)[time_step]
-    mid_mcp = joint_data.get_positions(DataType.NORM, Joint.MM)[time_step]
-    pinky_mcp = joint_data.get_positions(DataType.NORM, Joint.PM)[time_step]
-
-    unit_z = mid_mcp - origin  # vector from wrist to mid_mcp
-    # divide by magnitude (becomes unit vector)
-    unit_z = unit_z/np.linalg.norm(unit_z)
-
-    vec_y = pinky_mcp - origin
-    unit_x = np.cross(vec_y, unit_z)  # perpendicular
-    unit_x = unit_x/np.linalg.norm(unit_x)
-
-    unit_y = np.cross(unit_z, unit_x)
-
-    # rotational matrix for linear transformation
-    R: np.ndarray = np.array([-unit_x, -unit_y, unit_z]).reshape((3, 3))
-
-    def change_of_basis(tip_idx: Joint, mcp_idx: Joint) -> np.ndarray:
-        v = joint_data.get_positions(DataType.WORLD, tip_idx)[time_step] - \
-            joint_data.get_positions(DataType.WORLD, mcp_idx)[time_step]
-        return R @ v
-
-    index = change_of_basis(Joint.IT, Joint.IM)
-    middle = change_of_basis(Joint.MT, Joint.MM)
-    ring = change_of_basis(Joint.RT, Joint.RM)
-    thumb = change_of_basis(Joint.TT, Joint.TM)
-
-    print("index:", index)
-    print("middle:", middle)
-    print("ring:", ring)
-    print("thumb:", thumb)
-    print()
-
-    res = [{'r_tip1': index, 'r_tip2': middle,
-            'r_tip3': ring, 'r_tip4': thumb}]
+    res = [{'r_tip1': result[time_step, 0:3], 'r_tip2': result[time_step, 3:6],
+            'r_tip3': result[time_step, 6:9], 'r_tip4': result[time_step, 9:12]}]
 
     return res
 
@@ -54,7 +21,7 @@ def main():
     node = Node()
 
     joint_data = JointData(
-        "C:\\Users\\prabh\\Documents\\eeg\\data\\test2.npy")
+        "C:/Users/prabh/Documents/eeg/data/open_fist.npy")
 
     pa.array([])  # initialize pyarrow array
     time_step = 0

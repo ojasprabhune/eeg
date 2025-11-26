@@ -24,3 +24,7 @@ We can use this file to train on any type of data. For example, we can train it 
 #### Arguments
 1. Save location
 1. Data file location
+
+### `save_data.py`
+
+Splits data in a folder into 80% training data and 20% validation data and saves the datasets in a dataset directory.
