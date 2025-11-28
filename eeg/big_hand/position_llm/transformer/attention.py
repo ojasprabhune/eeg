@@ -121,7 +121,7 @@ class MultiHeadAttention(nn.Module):
         if mask is not None:
             # want to change values of scaled_lookup where mask is 0
             # masked == 0 creates new tensor of true and false
-            scaled_lookup.masked_fill(mask == 0, float("-inf"))
+            scaled_lookup = scaled_lookup.masked_fill(mask == 0, float("-inf"))
 
         # similarities summed to 1 for last dimension
         attention = F.softmax(scaled_lookup, dim=-1)
