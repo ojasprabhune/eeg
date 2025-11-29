@@ -38,12 +38,12 @@ class PositionLLMLayer(nn.Module):
         self.norm1 = nn.LayerNorm(embedding_dim)
         self.norm2 = nn.LayerNorm(embedding_dim)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
         Q, K, V = x, x, x  # copies of input embedding
 
         # multi head attention
         residual_x = x
-        x = self.MHA(Q, K, V)
+        x = self.MHA(Q, K, V, mask)
         x = self.dropout(x)
         x += residual_x
         x = self.norm1(x)
@@ -110,8 +110,21 @@ class PositionLLM(nn.Module):
         )
         self.dropout = nn.Dropout(p=dropout)
 
+    def make_mask(self, x: torch.Tensor) -> torch.Tensor:
+        # dictionary of input embeddings
+        """
+        Create a mask to prevent attention to future tokens.
+        """
+
+        B, T, C = x.size()
+        ones = torch.ones((1, T, T))
+        out = torch.tril(ones, 1)
+
+        return out.to(x.device)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         sequence_embedding = self.embedding(x)  # (B, T, C)
+        decoder_mask = self.make_mask(sequence_embedding)
         # print(f"emb shape: {sequence_embedding.shape}")
         x = self.positional_encoding(sequence_embedding)  # add positional information
         # print(f"posenc shape: {x.shape}")
@@ -119,7 +132,7 @@ class PositionLLM(nn.Module):
 
         # process data on layers
         for positionllm_layer in self.positionllm_layers:
-            x = positionllm_layer(x)
+            x = positionllm_layer(x, decoder_mask)
 
         x = self.linear(x)
 

@@ -6,6 +6,9 @@ from .position_llm import PositionLLM
 
 class E2EPositionLLM(nn.Module):
     def __init__(self):
+        """
+        End to end position LLM.
+        """
         super().__init__()
 
         self.position_llm = PositionLLM(

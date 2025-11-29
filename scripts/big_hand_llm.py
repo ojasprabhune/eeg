@@ -1,9 +1,6 @@
 """
 Train a Position LLM to generalize to Ojas's hand movements. Implement all
 previous techniques like region tokenization on appendage vector components.
-
-TODO:
-    - hyperparameter tuning
 """
 
 import torch
@@ -125,7 +122,7 @@ def train(train_appendage: bool = True):
                 "scheduler": scheduler.state_dict()
             }
 
-            torch.save(latest_ckpt, f"/var/log/thavamount/eeg_ckpts/latest_{i}.pth")
+            torch.save(latest_ckpt, f"/var/log/thavamount/eeg_ckpts/e2e_posllm_latest.pth")
 
         elif i % 5000 == 0:
             # plot_out(model)

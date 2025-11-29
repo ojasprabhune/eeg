@@ -4,32 +4,36 @@ from torch.utils.data import Dataset
 
 from .utils import appendages
 from .tokenizer import RegionTokenizer
+from .vqvae import vqvae
 from eeg.data_collection import JointData
 
 
 class AppendageDataset(Dataset):
-    def __init__(self, seq_len: int = 900) -> None:
+    def __init__(self, data_path: str = "data/dataset", region_tokenizer_path: str = "models/appendages", seq_len: int = 900) -> None:
         """
-        AppendageDataset loading batches for tokenized appendage vector.
+        AppendageDataset loading batches for tokenized appendage vectors.
         """
         super().__init__()  # initialize super class Dataset (from torch)
 
-        self.region_tokenizer = RegionTokenizer("models/appendages")
+        self.region_tokenizer = RegionTokenizer(region_tokenizer_path)
+        # self.VQ_VAE = VQ_VAE()
 
-        self.train_data = np.load("data/dataset/training_dataset.npy")
-        self.val_data = np.load("data/dataset/validation_dataset.npy")
+        self.train_data = np.load(f"{data_path}/training_dataset.npy")
+        self.val_data = np.load(f"{data_path}/validation_dataset.npy")
 
         train_data_joints = JointData(self.train_data)
 
         self.app_data = appendages(train_data_joints)  # (T, 12)
+
+        # TODO: implement VQ-VAE
+
+        # self.vq_tokens
 
         self.region_tokens = self.region_tokenizer.encode(
             torch.tensor(self.app_data)
         )  # (T,)
 
         self.app_data = self.region_tokenizer.scaler.transform(self.app_data)
-        print("mean:", self.region_tokenizer.scaler.mean_)
-        print("std:", self.region_tokenizer.scaler.scale_)
 
         # regions will be a list of region sequences, each with shape (64,)
         self.regions = []
