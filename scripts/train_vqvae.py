@@ -45,12 +45,10 @@ def train():
             x_reconstructed, z_e, z_q = vqvae(appendage_batch.to(torch.float32).to(device))
 
             recon_loss = loss_fn(x_reconstructed, appendage_batch.to(torch.float32).to(device))
-            codebook_loss = loss_fn(z_e.detach(), z_q)
             commitment_loss = loss_fn(z_e, z_q.detach())
 
-            total_loss = recon_loss + codebook_loss + commitment_beta * commitment_loss
+            total_loss = recon_loss + commitment_beta * commitment_loss
             print(recon_loss)
-            print(codebook_loss)
             print(commitment_loss)
 
             iter_tqdm.set_postfix({"loss": total_loss.item()})
