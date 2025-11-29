@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 class VQVAEEncoder(nn.Module):
-    def __init__(self, input_dim: int, embedding_dim: int, codebook_size: int):
+    def __init__(self, input_dim: int, embedding_dim: int, codebook_size: int, decay: float, epsilon: float = 1e-5):
         """
         The VQ-VAE encoder takes in a sequence of appendage
         vectors of size (T, 12) and passes it through a
@@ -47,7 +47,11 @@ class VQVAEEncoder(nn.Module):
 
         self.codebook = nn.Embedding(num_embeddings=codebook_size,
                                      embedding_dim=embedding_dim)
-        self.codebook.weight.data.uniform_(-1/codebook_size, 1/codebook_size)
+        self.codebook.weight.data.normal_()
+        self.register_buffer('_ema_cluster_size', torch.zeros(codebook_size))
+        self._ema_w = nn.Parameter(torch.Tensor(codebook_size, embedding_dim))
+        self._ema_w.data.normal()
+
 
     def forward(self, x: torch.Tensor, return_toks: bool = False):
         """
