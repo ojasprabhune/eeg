@@ -13,8 +13,13 @@ class VQVAEDecoder(nn.Module):
 
         super().__init__()
 
-        self.linear1 = nn.Linear(in_features=embedding_dim, out_features=embedding_dim)
-        self.linear2 = nn.Linear(in_features=embedding_dim, out_features=output_dim)
+        self.conv1 = nn.Conv1d(embedding_dim, embedding_dim, kernel_size=3, stride=1, padding=1)
+        self.bn_1 = nn.BatchNorm1d(embedding_dim)
+        
+        self.conv2 = nn.Conv1d(embedding_dim, embedding_dim, kernel_size=3, stride=1, padding=1)
+        self.bn_2 = nn.BatchNorm1d(embedding_dim)
+        
+        self.conv3 = nn.Conv1d(embedding_dim, output_dim, kernel_size=3, stride=1, padding=1)
         self.relu = nn.ReLU()
 
     def forward(self, x: torch.Tensor):
@@ -22,8 +27,18 @@ class VQVAEDecoder(nn.Module):
         The forward pass of the VQ-VAE decoder layer.
         """
         
-        x = self.linear1(x)
+        x = x.transpose(-1, -2)
+
+        x = self.conv1(x)
+        x = self.bn_1(x)
         x = self.relu(x)
-        x = self.linear2(x)
+
+        x = self.conv2(x)
+        x = self.bn_2(x)
+        x = self.relu(x)
+
+        x = self.conv3(x)
+
+        x = x.transpose(-1, -2)
 
         return x

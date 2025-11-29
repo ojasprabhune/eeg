@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from eeg.big_hand.position_llm.vqvae import VQVAE
 from eeg.big_hand.position_llm import AppendageDataset
 
-lr = 3e-8
+lr = 3e-4
 device = "cuda"
 epochs = 10000
 
@@ -20,7 +20,7 @@ vqvae.to(device)
 
 optimizer = optim.AdamW(lr=lr, weight_decay=0.01, params=vqvae.parameters())
 loss_fn = nn.MSELoss()
-commitment_beta = 0.25
+commitment_beta = 1
 
 appendage_dataset: AppendageDataset = AppendageDataset()
 appendage_dataloader = DataLoader(appendage_dataset, batch_size=32, shuffle=True)

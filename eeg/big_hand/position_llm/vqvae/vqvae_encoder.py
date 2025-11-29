@@ -14,28 +14,31 @@ class VQVAEEncoder(nn.Module):
 
         self.conv_1 = nn.Conv1d(in_channels=input_dim,
                                 out_channels=embedding_dim,
-                                kernel_size=3,
+                                kernel_size=4,
                                 stride=1,
-                                padding=1
+                                padding=2
                                 )
+        self.bn_1 = nn.BatchNorm1d(embedding_dim)
                                 
         self.conv_2 = nn.Conv1d(in_channels=embedding_dim,
                                 out_channels=embedding_dim,
-                                kernel_size=3,
+                                kernel_size=4,
                                 stride=1,
                                 padding=1
                                 )
+        self.bn_2 = nn.BatchNorm1d(embedding_dim)
 
         self.conv_3 = nn.Conv1d(in_channels=embedding_dim,
                                 out_channels=embedding_dim,
-                                kernel_size=3,
+                                kernel_size=4,
                                 stride=1,
-                                padding=1
+                                padding=2
                                 )
+        self.bn_3 = nn.BatchNorm1d(embedding_dim)
 
         self.conv_4 = nn.Conv1d(in_channels=embedding_dim,
                                 out_channels=embedding_dim,
-                                kernel_size=3,
+                                kernel_size=4,
                                 stride=1,
                                 padding=1
                                 )
@@ -44,6 +47,7 @@ class VQVAEEncoder(nn.Module):
 
         self.codebook = nn.Embedding(num_embeddings=codebook_size,
                                      embedding_dim=embedding_dim)
+        self.codebook.weight.data.uniform_(-1/codebook_size, 1/codebook_size)
 
     def forward(self, x: torch.Tensor, return_toks: bool = False):
         """
@@ -55,12 +59,15 @@ class VQVAEEncoder(nn.Module):
         x = x.transpose(-1, -2)
 
         x = self.conv_1(x)
+        x = self.bn_1(x)
         x = self.relu(x)
 
         x = self.conv_2(x)
+        x = self.bn_2(x)
         x = self.relu(x)
 
         x = self.conv_3(x)
+        x = self.bn_3(x)
         x = self.relu(x)
 
         x = self.conv_4(x)
