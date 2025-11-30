@@ -13,6 +13,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 from eeg.big_hand.position_llm import E2EPositionLLM, AppendageDataset
+from eeg.big_hand.position_llm.vqvae import VQVAE
 
 appendage_dataset: AppendageDataset = AppendageDataset()
 
@@ -43,10 +44,19 @@ def lr_lambda(step):
 device = "cuda"
 epochs = 10000
 
-model = E2EPositionLLM()  # end to end position llm
-model.to(device)
+model = E2EPositionLLM(vocab_size=512,
+                       num_layers=4,
+                       num_heads=4,
+                       embedding_dim=64,
+                       ffn_hidden_dim=64,
+                       qk_length=64,
+                       max_length=2048,
+                       dropout=0.1,
+                       )  # end to end position llm
+
 optimizer = AdamW(model.parameters(), lr=base_lr, betas=[0.9, 0.98], eps=1e-9)
 scheduler = LambdaLR(optimizer, lr_lambda=lr_lambda)
+
 class_loss_fn = CrossEntropyLoss()
 appendage_loss_fn = MSELoss()
 lambda_appendage_loss = 1
@@ -55,6 +65,17 @@ lambda_appendage_loss = 1
 # model.load_state_dict(state_dict["model"])
 # optimizer.load_state_dict(state_dict["optimizer"])
 # scheduler.load_state_dict(state_dict["scheduler"])
+
+VQVAE = VQVAE(input_dim=12,
+              codebook_size=512,
+              embedding_dim=16,
+              decay=0.99)
+
+vqvae_state_dict = torch.load("/var/log/thavamount/eeg_ckpts/vqvae.pth", map_location="cuda")
+VQVAE.load_state_dict(vqvae_state_dict["model"])
+
+model.to(device)
+VQVAE.to(device)
 
 
 def train(train_appendage: bool = True):
@@ -78,8 +99,17 @@ def train(train_appendage: bool = True):
     iter_tqdm = tqdm(range(epochs))
     for i in tqdm(range(epochs)):
         iter_tqdm.set_description(f"Epoch {i + 1}")
-        # iter_tqdm = appendage_dataloader
-        for region_batch, appendage_batch in appendage_dataloader:
+        
+        # for region_batch, appendage_batch in appendage_dataloader:
+        for appendage_batch in appendage_dataloader:
+            # appendage_batch: (B, T, 12) - goes into VQVAE
+
+            recon, x_e, x_q = VQVAE(appendage_batch.to(torch.float32).to(device))
+
+            # x_q: (B, T, embedding_dim) - output from codebook
+
+
+
             in_region_tokens = (
                 region_batch[:, :-1].to(torch.int64).to(device)
             )  # (1, T-1,)
@@ -112,6 +142,7 @@ def train(train_appendage: bool = True):
             total_loss.backward()  # calculates and adds gradients to params so optim sees
             optimizer.step()  # optim looks at gradients and steps accordingly
             scheduler.step()
+
         if i % 500 == 0:
             # plot_out(model)
 
@@ -122,7 +153,8 @@ def train(train_appendage: bool = True):
                 "scheduler": scheduler.state_dict()
             }
 
-            torch.save(latest_ckpt, f"/var/log/thavamount/eeg_ckpts/e2e_posllm_latest.pth")
+            # torch.save(latest_ckpt, f"/var/log/thavamount/eeg_ckpts/e2e_posllm_latest.pth")
+            torch.save(latest_ckpt, f"/var/log/thavamount/eeg_ckpts/eeg_vqvae/e2e_posllm_vqvae_latest.pth")
 
         elif i % 5000 == 0:
             # plot_out(model)
@@ -134,15 +166,16 @@ def train(train_appendage: bool = True):
                 "scheduler": scheduler.state_dict()
             }
 
-            torch.save(checkpoint, f"/var/log/thavamount/eeg_ckpts/checkpoint_{i}.pth")
+            # torch.save(checkpoint, f"/var/log/thavamount/eeg_ckpts/checkpoint_{i}.pth")
+            torch.save(checkpoint, f"/var/log/thavamount/eeg_ckpts/eeg_vqvae/checkpoint_{i}.pth")
 
 
     run.finish()
     model.to("cpu")
 
 
-region_tokens, appendage_values = appendage_dataset[0]
-print(appendage_values)
+# region_tokens, appendage_values = appendage_dataset[0]
+# print(appendage_values)
 
 
 def inference(model: torch.nn.Module) -> torch.Tensor:
