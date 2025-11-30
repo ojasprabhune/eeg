@@ -36,21 +36,37 @@ class VQVAEDecoder(nn.Module):
         
         x = x.transpose(-1, -2)
 
+        start_x = x
+
         x = self.conv1(x)
         x = self.bn_1(x)
         x = self.relu(x)
+
+        x = x + start_x
+
+        start_x = x
 
         x = self.conv2(x)
         x = self.bn_2(x)
         x = self.relu(x)
 
+        x = x + start_x
+
+        start_x = x
+
         x = self.conv3(x)
         x = self.bn_3(x)
         x = self.relu(x)
 
+        x = x + start_x
+
+        start_x = x
+
         x = self.conv4(x)
         x = self.bn_4(x)
         x = self.relu(x)
+
+        x = x + start_x
 
         x = self.conv5(x)
 

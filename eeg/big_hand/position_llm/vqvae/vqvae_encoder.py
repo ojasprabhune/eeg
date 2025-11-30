@@ -82,25 +82,47 @@ class VQVAEEncoder(nn.Module):
         
         x = x.transpose(-1, -2)
 
+        start_x = x
+
         x = self.conv_1(x)
         x = self.bn_1(x)
         x = self.relu(x)
+
+        x = x + start_x
+
+        start_x = x
 
         x = self.conv_2(x)
         x = self.bn_2(x)
         x = self.relu(x)
 
+        x = x + start_x
+
+        start_x = x
+
         x = self.conv_3(x)
         x = self.bn_3(x)
         x = self.relu(x)
+
+        x = x + start_x
+
+        start_x = x
 
         x = self.conv_4(x)
         x = self.bn_4(x)
         x = self.relu(x)
 
+        x = x + start_x
+
+        start_x = x
+
         x = self.conv_5(x)
         x = self.bn_5(x)
         x = self.relu(x)
+
+        x = x + start_x
+
+        start_x = x
 
         x = self.conv_6(x)
 
