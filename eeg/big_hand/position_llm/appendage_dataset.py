@@ -4,7 +4,6 @@ from torch.utils.data import Dataset
 
 from .utils import appendages
 from .tokenizer import RegionTokenizer
-from .vqvae import vqvae
 from eeg.data_collection import JointData
 
 
@@ -16,7 +15,6 @@ class AppendageDataset(Dataset):
         super().__init__()  # initialize super class Dataset (from torch)
 
         self.region_tokenizer = RegionTokenizer(region_tokenizer_path)
-        # self.VQ_VAE = VQ_VAE()
 
         self.train_data = np.load(f"{data_path}/training_dataset.npy")
         self.val_data = np.load(f"{data_path}/validation_dataset.npy")
@@ -24,10 +22,6 @@ class AppendageDataset(Dataset):
         train_data_joints = JointData(self.train_data)
 
         self.app_data = appendages(train_data_joints)  # (T, 12)
-
-        # TODO: implement VQ-VAE
-
-        # self.vq_tokens
 
         self.region_tokens = self.region_tokenizer.encode(
             torch.tensor(self.app_data)
@@ -67,4 +61,5 @@ class AppendageDataset(Dataset):
         which converts to:
             b = dataset.__getitem__(0)
         """
-        return self.regions[index], self.appendages[index]
+        # return self.regions[index], self.appendages[index]
+        return self.appendages[index] # do VQVAE in train.py

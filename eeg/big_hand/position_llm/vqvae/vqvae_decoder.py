@@ -6,7 +6,7 @@ class VQVAEDecoder(nn.Module):
     def __init__(self, output_dim: int, embedding_dim: int):
         """
         The VQ-VAE decoder will take in an embedding of size
-        (T, embedding_dim) and will output a sequence of
+        (B, T, embedding_dim) and will output a sequence of
         appendage vectors of size (B, T, 12). It will pass through
         multiple linear and 1 dimensional convolutional layers.
         """
@@ -19,7 +19,14 @@ class VQVAEDecoder(nn.Module):
         self.conv2 = nn.Conv1d(embedding_dim, embedding_dim, kernel_size=3, stride=1, padding=1)
         self.bn_2 = nn.BatchNorm1d(embedding_dim)
         
-        self.conv3 = nn.Conv1d(embedding_dim, output_dim, kernel_size=3, stride=1, padding=1)
+        self.conv3 = nn.Conv1d(embedding_dim, embedding_dim, kernel_size=3, stride=1, padding=1)
+        self.bn_3 = nn.BatchNorm1d(embedding_dim)
+        
+        self.conv4 = nn.Conv1d(embedding_dim, embedding_dim, kernel_size=3, stride=1, padding=1)
+        self.bn_4 = nn.BatchNorm1d(embedding_dim)
+        
+        self.conv5 = nn.Conv1d(embedding_dim, output_dim, kernel_size=3, stride=1, padding=1)
+
         self.relu = nn.ReLU()
 
     def forward(self, x: torch.Tensor):
@@ -38,6 +45,14 @@ class VQVAEDecoder(nn.Module):
         x = self.relu(x)
 
         x = self.conv3(x)
+        x = self.bn_3(x)
+        x = self.relu(x)
+
+        x = self.conv4(x)
+        x = self.bn_4(x)
+        x = self.relu(x)
+
+        x = self.conv5(x)
 
         x = x.transpose(-1, -2)
 

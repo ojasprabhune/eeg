@@ -5,7 +5,17 @@ from .position_llm import PositionLLM
 
 
 class E2EPositionLLM(nn.Module):
-    def __init__(self):
+    def __init__(self,
+                 vocab_size=512,
+                 num_layers=4,
+                 num_heads=4,
+                 embedding_dim=64,
+                 ffn_hidden_dim=64,
+                 qk_length=64,
+                 value_length=64,
+                 max_length=2048,
+                 dropout=0.1,
+                 ):
         """
         End to end position LLM.
         """
@@ -13,15 +23,15 @@ class E2EPositionLLM(nn.Module):
 
         self.position_llm = PositionLLM(
             # vocab size is amount of regions
-            vocab_size=50,
-            num_layers=4,
-            num_heads=4,
-            embedding_dim=64,
-            ffn_hidden_dim=64,
-            qk_length=64,
-            value_length=64,
-            max_length=2048,
-            dropout=0.1,
+            vocab_size=vocab_size,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            embedding_dim=embedding_dim,
+            ffn_hidden_dim=ffn_hidden_dim,
+            qk_length=qk_length,
+            value_length=value_length,
+            max_length=max_length,
+            dropout=dropout,
         )
 
         # predict appendage vectors based on regions

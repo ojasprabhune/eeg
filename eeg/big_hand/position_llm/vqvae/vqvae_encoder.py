@@ -6,9 +6,9 @@ class VQVAEEncoder(nn.Module):
     def __init__(self, input_dim: int, embedding_dim: int, codebook_size: int, decay: float, epsilon: float = 1e-5):
         """
         The VQ-VAE encoder takes in a sequence of appendage
-        vectors of size (T, 12) and passes it through a
+        vectors of size (B, T, 12) and passes it through a
         series of 1 dimensional convolutional layers to output a
-        an embedding of size (T, embedding_dim).
+        an embedding of size (B, T, embedding_dim).
         """
 
         super().__init__()
@@ -38,6 +38,22 @@ class VQVAEEncoder(nn.Module):
         self.bn_3 = nn.BatchNorm1d(embedding_dim)
 
         self.conv_4 = nn.Conv1d(in_channels=embedding_dim,
+                                out_channels=embedding_dim,
+                                kernel_size=4,
+                                stride=1,
+                                padding=1
+                                )
+        self.bn_4 = nn.BatchNorm1d(embedding_dim)
+
+        self.conv_5 = nn.Conv1d(in_channels=embedding_dim,
+                                out_channels=embedding_dim,
+                                kernel_size=4,
+                                stride=1,
+                                padding=2
+                                )
+        self.bn_5 = nn.BatchNorm1d(embedding_dim)
+
+        self.conv_6 = nn.Conv1d(in_channels=embedding_dim,
                                 out_channels=embedding_dim,
                                 kernel_size=4,
                                 stride=1,
@@ -79,6 +95,14 @@ class VQVAEEncoder(nn.Module):
         x = self.relu(x)
 
         x = self.conv_4(x)
+        x = self.bn_4(x)
+        x = self.relu(x)
+
+        x = self.conv_5(x)
+        x = self.bn_5(x)
+        x = self.relu(x)
+
+        x = self.conv_6(x)
 
         z_e = x.transpose(-1, -2)
 
