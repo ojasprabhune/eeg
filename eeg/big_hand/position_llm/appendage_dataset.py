@@ -61,5 +61,4 @@ class AppendageDataset(Dataset):
         which converts to:
             b = dataset.__getitem__(0)
         """
-        # return self.regions[index], self.appendages[index]
-        return self.appendages[index] # do VQVAE in train.py
+        return self.regions[index], self.appendages[index]

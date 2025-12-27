@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from .transformer import Decoder 
+from .transformer import Encoder 
 
 class VQVAEDecoder(nn.Module):
     def __init__(self, output_dim: int, embedding_dim: int):
@@ -13,7 +13,7 @@ class VQVAEDecoder(nn.Module):
 
         super().__init__()
 
-        self.decoder = Decoder(
+        self.encoder = Encoder(
             num_layers=4,
             num_heads=4,
             embedding_dim=embedding_dim,
@@ -24,14 +24,15 @@ class VQVAEDecoder(nn.Module):
             dropout=0.1,
         )
 
-        self.linear1 = nn.Linear(embedding_dim, embedding_dim)
-
-        self.leaky_relu = nn.LeakyReLU()
+        self.linear = nn.Linear(embedding_dim, output_dim)
 
 
-    def forward(self, src: torch.Tensor, tgt: torch.Tensor):
+    def forward(self, x: torch.Tensor):
         """
         The forward pass of the VQ-VAE decoder layer.
         """
+
+        x = self.encoder(x) # B, T, C
+        x = self.linear(x) # B, T, 12
 
         return x

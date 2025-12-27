@@ -27,8 +27,6 @@ class VQVAEEncoder(nn.Module):
         
         self.linear = nn.Linear(input_dim, embedding_dim)
 
-        self.leaky_relu = nn.LeakyReLU()
-
         self.codebook = nn.Embedding(num_embeddings=codebook_size,
                                      embedding_dim=embedding_dim)
         self.codebook.weight.data.normal_()

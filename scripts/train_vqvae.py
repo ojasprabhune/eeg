@@ -22,7 +22,7 @@ optimizer = optim.AdamW(vqvae.parameters(), lr=lr)
 loss_fn = nn.MSELoss()
 commitment_beta = 0.25
 
-appendage_dataset: AppendageDataset = AppendageDataset()
+appendage_dataset: AppendageDataset = AppendageDataset(data_path="/var/log/thavamount/eeg_dataset")
 appendage_dataloader = DataLoader(appendage_dataset, batch_size=32, shuffle=True)
 
 def train():
