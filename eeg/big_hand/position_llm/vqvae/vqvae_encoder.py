@@ -8,113 +8,25 @@ class VQVAEEncoder(nn.Module):
     def __init__(self, input_dim: int, embedding_dim: int, codebook_size: int, decay: float, epsilon: float = 1e-5):
         """
         The VQ-VAE encoder takes in a sequence of appendage
-        vectors of size (B, T, 12) and passes it through a
-        series of 1 dimensional convolutional layers to output a
+        vectors of size (B, T, 12) and outputs a
         an embedding of size (B, T, embedding_dim).
         """
 
         super().__init__()
 
-        self.encoder = Encoder()
-
-        self.rnn1 = nn.RNN(input_size=input_dim,
-                          hidden_size=embedding_dim,
-                          num_layers=4,
-                          nonlinearity="tanh",
-                          batch_first=True,
-                          )
-                          
-        self.rnn2 = nn.RNN(input_size=embedding_dim,
-                          hidden_size=embedding_dim,
-                          num_layers=4,
-                          nonlinearity="tanh",
-                          batch_first=True,
-                          )
-
-        self.conv_1 = nn.Conv1d(in_channels=embedding_dim,
-                                out_channels=embedding_dim,
-                                kernel_size=3,
-                                stride=1,
-                                padding=1
-                                )
-        self.bn_1 = nn.BatchNorm1d(embedding_dim)
-                                
-        self.conv_2 = nn.Conv1d(in_channels=embedding_dim,
-                                out_channels=embedding_dim,
-                                kernel_size=3,
-                                stride=1,
-                                padding=1
-                                )
-        self.bn_2 = nn.BatchNorm1d(embedding_dim)
-
-        self.conv_3 = nn.Conv1d(in_channels=embedding_dim,
-                                out_channels=embedding_dim,
-                                kernel_size=3,
-                                stride=1,
-                                padding=1
-                                )
-        self.bn_3 = nn.BatchNorm1d(embedding_dim)
-
-        self.conv_4 = nn.Conv1d(in_channels=embedding_dim,
-                                out_channels=embedding_dim,
-                                kernel_size=3,
-                                stride=1,
-                                padding=1
-                                )
-        self.bn_4 = nn.BatchNorm1d(embedding_dim)
-
-        self.conv_5 = nn.Conv1d(in_channels=embedding_dim,
-                                out_channels=embedding_dim,
-                                kernel_size=3,
-                                stride=1,
-                                padding=1
-                                )
-        self.bn_5 = nn.BatchNorm1d(embedding_dim)
-
-        self.conv_6 = nn.Conv1d(in_channels=embedding_dim,
-                                out_channels=embedding_dim,
-                                kernel_size=3,
-                                stride=1,
-                                padding=1
-                                )
-        self.bn_6 = nn.BatchNorm1d(embedding_dim)
-
-        self.conv_7 = nn.Conv1d(in_channels=embedding_dim,
-                                out_channels=embedding_dim,
-                                kernel_size=3,
-                                stride=1,
-                                padding=1
-                                )
-                                
-        self.bn_7 = nn.BatchNorm1d(embedding_dim)
-
-        self.conv_8 = nn.Conv1d(in_channels=embedding_dim,
-                                out_channels=embedding_dim,
-                                kernel_size=3,
-                                stride=1,
-                                padding=1
-                                )
-
-        self.bn_8 = nn.BatchNorm1d(embedding_dim)
-
-        self.conv_9 = nn.Conv1d(in_channels=embedding_dim,
-                                out_channels=embedding_dim,
-                                kernel_size=3,
-                                stride=1,
-                                padding=1
-                                )
+        self.encoder = Encoder(
+            num_layers=4,
+            num_heads=4,
+            embedding_dim=embedding_dim,
+            ffn_hidden_dim=embedding_dim,
+            qk_length=64,
+            value_length=64,
+            max_length=2048,
+            dropout=0.1,
+            )
         
-        self.linear1 = nn.Linear(embedding_dim, embedding_dim)
-        self.linear2 = nn.Linear(embedding_dim, embedding_dim)
-        self.linear3 = nn.Linear(embedding_dim, embedding_dim)
-        self.linear4 = nn.Linear(embedding_dim, embedding_dim)
-        self.linear5 = nn.Linear(embedding_dim, embedding_dim)
-        self.linear6 = nn.Linear(embedding_dim, embedding_dim)
-        self.linear7 = nn.Linear(embedding_dim, embedding_dim)
-        self.linear8 = nn.Linear(embedding_dim, embedding_dim)
-        self.linear9 = nn.Linear(embedding_dim, embedding_dim)
+        self.linear = nn.Linear(input_dim, embedding_dim)
 
-        self.relu = nn.ReLU()
         self.leaky_relu = nn.LeakyReLU()
 
         self.codebook = nn.Embedding(num_embeddings=codebook_size,
@@ -132,112 +44,11 @@ class VQVAEEncoder(nn.Module):
         """
         The forward pass of the VQ-VAE encoder layer.
 
-        Input size: (B, T, C)
+        Input size: (B, T, 12)
         """
 
-        x, hn = self.rnn1(x)
-        x, hn = self.rnn2(x)
-
-        x = self.linear1(x)
-        x = x.transpose(-1, -2) # (B, C, T)
-        x = self.conv_1(x)
-        x = self.bn_1(x)
-        x = self.relu(x)
-
-        start_x = x
-
-        x = x.transpose(-1, -2) # (B, T, C)
-        x = self.linear2(x)
-        x = x.transpose(-1, -2) # (B, C, T)
-        x = self.leaky_relu(x)
-        x = self.conv_2(x)
-        x = self.bn_2(x)
-        x = self.relu(x)
-
-
-        x = x + start_x
-
-        start_x = x
-
-        x = x.transpose(-1, -2) # (B, T, C)
-        x = self.linear3(x)
-        x = x.transpose(-1, -2) # (B, C, T)
-        x = self.leaky_relu(x)
-        x = self.conv_3(x)
-        x = self.bn_3(x)
-        x = self.relu(x)
-
-        x = x + start_x
-
-        start_x = x
-
-        x = x.transpose(-1, -2) # (B, T, C)
-        x = self.linear4(x)
-        x = x.transpose(-1, -2) # (B, C, T)
-        x = self.leaky_relu(x)
-        x = self.conv_4(x)
-        x = self.bn_4(x)
-        x = self.relu(x)
-
-        x = x + start_x
-
-        start_x = x
-
-        x = x.transpose(-1, -2) # (B, T, C)
-        x = self.linear5(x)
-        x = x.transpose(-1, -2) # (B, C, T)
-        x = self.leaky_relu(x)
-        x = self.conv_5(x)
-        x = self.bn_5(x)
-        x = self.relu(x)
-
-        x = x + start_x
-
-        start_x = x
-
-        x = x.transpose(-1, -2) # (B, T, C)
-        x = self.linear6(x)
-        x = x.transpose(-1, -2) # (B, C, T)
-        x = self.leaky_relu(x)
-        x = self.conv_6(x)
-        x = self.bn_6(x)
-        x = self.relu(x)
-
-        x = x + start_x
-
-        start_x = x
-
-        x = x.transpose(-1, -2) # (B, T, C)
-        x = self.linear7(x)
-        x = x.transpose(-1, -2) # (B, C, T)
-        x = self.leaky_relu(x)
-        x = self.conv_7(x)
-        x = self.bn_7(x)
-        x = self.relu(x)
-
-        x = x + start_x
-
-        start_x = x
-
-        x = x.transpose(-1, -2) # (B, T, C)
-        x = self.linear8(x)
-        x = x.transpose(-1, -2) # (B, C, T)
-        x = self.leaky_relu(x)
-        x = self.conv_8(x)
-        x = self.bn_8(x)
-        x = self.relu(x)
-
-        x = x + start_x
-
-        start_x = x
-
-        x = x.transpose(-1, -2) # (B, T, C)
-        x = self.linear9(x)
-        x = x.transpose(-1, -2) # (B, C, T)
-        x = self.leaky_relu(x)
-        x = self.conv_9(x)
-
-        z_e = x.transpose(-1, -2)
+        x = self.linear(x) # B, T, C
+        z_e = self.encoder(x) # B, T, C
 
         dist = torch.cdist(z_e, self.codebook.weight, p=2.0)
 

@@ -114,7 +114,6 @@ class EncoderLayer(nn.Module):
 class Encoder(nn.Module):
     def __init__(
         self,
-        vocab_size: int,
         num_layers: int,
         num_heads: int,
         embedding_dim: int,
@@ -144,7 +143,6 @@ class Encoder(nn.Module):
         """
         super().__init__()
 
-        self.vocab_size = vocab_size
         self.num_layers = num_layers
         self.num_heads = num_heads
         self.embedding_dim = embedding_dim
@@ -162,7 +160,6 @@ class Encoder(nn.Module):
         # and then use the other layers we've implemented to
         # build out the Transformer encoder.
 
-        self.embedding = nn.Embedding(vocab_size, embedding_dim)
         self.encoder_layers = nn.ModuleList(
             [
                 EncoderLayer(
@@ -186,8 +183,7 @@ class Encoder(nn.Module):
         The forward pass of the Encoder.
         """
 
-        sequence_embedding = self.embedding(x)  # (B, T, C)
-        x = self.positional_encoding(sequence_embedding)
+        x = self.positional_encoding(x)
         x = self.dropout(x)
         for encoder_layer in self.encoder_layers:
             x = encoder_layer(x)
