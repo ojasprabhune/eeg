@@ -94,29 +94,31 @@ class AppendageDataset(Dataset):
             else:
                 # vqvae_tokens, appendage_values, durations, mask
                 # vqvae_tokens: (T,)
-                reversed_vqvae_toks = vqvae_tokens[::-1]
-                durations = [1]
-                for i in range(1, len(reversed_vqvae_toks)):
-                    # counting backwards
-                    current_tok = reversed_vqvae_toks[i]
-                    prev_tok = reversed_vqvae_toks[i - 1]
-
-                    if prev_tok == current_tok:
-                        durations.append(durations[-1] + 1)
-                    else:
-                        durations.append(1)
                 
+                # Vectorized duration calculation
+                # Find where tokens change (going backwards)
+                reversed_vqvae_toks = vqvae_tokens[::-1]
+                token_changes = np.concatenate([[True], reversed_vqvae_toks[1:] != reversed_vqvae_toks[:-1]])
+                
+                # Calculate run lengths
+                run_lengths = np.zeros(len(reversed_vqvae_toks), dtype=np.float32)
+                current_length = 1
+                for i in range(len(reversed_vqvae_toks)):
+                    if token_changes[i]:
+                        current_length = 1
+                    run_lengths[i] = current_length
+                    current_length += 1
+                
+                # Apply log10 transform and reverse back
+                durations = np.log10(run_lengths)
                 durations = durations[::-1]
-
-                masks = [1]
-                for i in range(len(vqvae_tokens) - 1):
-                    current_tok = vqvae_tokens[i]
-                    next_tok = vqvae_tokens[i + 1]
-
-                    if next_tok == current_tok:
-                        masks.append(0)
-                    else:
-                        masks.append(1)
+                
+                # Vectorized mask calculation
+                # mask is 1 when next token is different, 0 when same
+                masks = np.concatenate([
+                    vqvae_tokens[:-1] != vqvae_tokens[1:],  # 1 where tokens differ
+                    [True]  # last position always gets mask=1
+                ]).astype(np.float32)
                 
                 return {
                     "tokens": vqvae_tokens,
@@ -134,10 +136,10 @@ class AppendageDataset(Dataset):
         """
 
         if isinstance(batch[0], dict):
-            region_tokens = torch.tensor([item["tokens"] for item in batch]).to(torch.int64)  # (B, T)
-            appendage_values = torch.tensor([item["values"] for item in batch]).to(torch.float32)  # (B, T, 12)
-            durations = torch.tensor([item["durations"] for item in batch]).to(torch.float32)  # (B, T)
-            masks = torch.tensor([item["masks"] for item in batch]).to(torch.float32)  # (B, T)
+            region_tokens = torch.tensor(np.array([item["tokens"] for item in batch])).to(torch.int64)  # (B, T)
+            appendage_values = torch.tensor(np.array([item["values"] for item in batch])).to(torch.float32)  # (B, T, 12)
+            durations = torch.tensor(np.array([item["durations"] for item in batch])).to(torch.float32)  # (B, T)
+            masks = torch.tensor(np.array([item["masks"] for item in batch])).to(torch.float32)  # (B, T)
 
             return {
                 "tokens": region_tokens,

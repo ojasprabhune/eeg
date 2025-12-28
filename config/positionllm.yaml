@@ -1,0 +1,17 @@
+hyperparameters:
+  batch_size: 32
+  warmup_steps: 4000
+  base_lr: 5e-5
+  epochs: 10000
+  vocab_size: 512
+  num_layers: 4
+  num_heads: 4
+  embedding_dim: 64
+  ffn_hidden_dim: 64
+  qk_length: 64
+  value_length: 64
+  max_length: 2048
+  dropout: 0.1
+  duration_prediction: True
+  lambda_duration: 5
+  run_name: VQVAE_big_hand
