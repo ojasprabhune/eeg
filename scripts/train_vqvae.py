@@ -1,4 +1,5 @@
 import wandb
+import argparse
 from tqdm import tqdm
 
 import torch
@@ -11,11 +12,17 @@ from eeg.big_hand.position_llm import AppendageDataset
 
 lr = 3e-4
 device = "cuda"
-epochs = 10000
+epochs = 2000
+
+parser = argparse.ArgumentParser()
+parser.add_argument("checkpoint_name", type=str, help="The name of the saved checkpoint")
+args = parser.parse_args()
+
+checkpoint_name = args.checkpoint_name
 
 vqvae = VQVAE(input_dim=12,
               codebook_size=512,
-              embedding_dim=16)
+              embedding_dim=1024)
 vqvae.to(device)
 
 optimizer = optim.AdamW(vqvae.parameters(), lr=lr)
@@ -25,9 +32,28 @@ commitment_beta = 0.25
 appendage_dataset: AppendageDataset = AppendageDataset(data_path="/var/log/thavamount/eeg_dataset")
 appendage_dataloader = DataLoader(appendage_dataset, batch_size=32, shuffle=True)
 
+def save_checkpoint(epoch: int, latest: bool) -> None:
+    if latest:
+        checkpoint = {
+            "epoch": epoch,
+            "model": vqvae.state_dict(),
+            "optimizer": optimizer.state_dict(),
+        }
+
+        torch.save(checkpoint, f"/var/log/thavamount/eeg_ckpts/eeg_vqvae/{checkpoint_name}.pth")
+    else:
+        checkpoint = {
+            "epoch": epoch,
+            "model": vqvae.state_dict(),
+            "optimizer": optimizer.state_dict(),
+        }
+
+        torch.save(checkpoint, f"/var/log/thavamount/eeg_ckpts/eeg_vqvae/{checkpoint_name}_{epoch}.pth")
+        
+
 def train():
     run = wandb.init(
-        name="vq_vae_10_000",
+        name="vqvae_final",
         entity="prabhuneojas-evergreen-valley-high-school",
         project="eeg",
         config={
@@ -38,10 +64,12 @@ def train():
         },
     )
 
-    iter_tqdm = tqdm(range(epochs))
-    for i in tqdm(range(epochs)):
-        iter_tqdm.set_description(f"Epoch {i + 1}")
-        for region_batch, appendage_batch in appendage_dataloader:
+    for epoch in range(epochs):
+        for region_batch, appendage_batch in tqdm(
+            appendage_dataloader,
+            desc=f"Epoch {epoch + 1}",
+            dynamic_ncols=True,
+        ):
             x_reconstructed, z_e, z_q = vqvae(appendage_batch.to(torch.float32).to(device))
 
             recon_loss = loss_fn(x_reconstructed, appendage_batch.to(torch.float32).to(device))
@@ -49,23 +77,17 @@ def train():
 
             total_loss = recon_loss + commitment_beta * commitment_loss
 
-            iter_tqdm.set_postfix({"loss": total_loss.item()})
             run.log({"loss": total_loss.item()})
 
             optimizer.zero_grad()
             total_loss.backward()
             optimizer.step()
 
-        if i % 2000 == 0:
-
-            checkpoint = {
-                "epoch": i,
-                "model": vqvae.state_dict(),
-                "optimizer": optimizer.state_dict(),
-            }
-
-            torch.save(checkpoint, f"/var/log/thavamount/eeg_ckpts/vqvae.pth")
+        if epoch % 250 == 0:
+            save_checkpoint(epoch=epoch, latest=False)
 
     run.finish()
 
+
 train()
+save_checkpoint(epochs, latest=True)

@@ -38,7 +38,10 @@ class E2EPositionLLM(nn.Module):
         self.linear = nn.Linear(50, 12)
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        """Needs to have shape (B, T)"""
+        """
+        Needs to have shape (B, T)
+        """
+
         region_tokens = x
         B, T = x.shape
 

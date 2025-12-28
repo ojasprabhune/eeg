@@ -12,10 +12,14 @@ class VQVAE(nn.Module):
         self.encoder = VQVAEEncoder(input_dim=input_dim, embedding_dim=embedding_dim, codebook_size=codebook_size, decay=decay)
         self.decoder = VQVAEDecoder(output_dim=input_dim, embedding_dim=embedding_dim)
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor, return_toks: bool = False):
 
-        z_e, z_q = self.encoder(x)
+        if return_toks:
+            q_token_ids = self.encoder(x, return_toks=True)
+
+            return q_token_ids
+        else:
+            z_e, z_q = self.encoder(x, return_toks=False)
+            x = self.decoder(z_q)
         
-        x = self.decoder(z_q)
-        
-        return x, z_e, z_q
+            return x, z_e, z_q

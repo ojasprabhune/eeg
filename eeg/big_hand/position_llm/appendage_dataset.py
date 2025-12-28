@@ -5,16 +5,30 @@ from torch.utils.data import Dataset
 from .utils import appendages
 from .tokenizer import RegionTokenizer
 from eeg.data_collection import JointData
+from eeg.big_hand.position_llm.vqvae import VQVAE
 
 
 class AppendageDataset(Dataset):
-    def __init__(self, data_path: str = "data/dataset", region_tokenizer_path: str = "models/appendages", seq_len: int = 900) -> None:
+    def __init__(self,
+                 data_path: str = "/var/log/thavamount/eeg_dataset",
+                 vqvae_path: str = "/var/log/thavamount/eeg_ckpts/eeg_vqvae/vqvae_final_1250.pth",
+                 region_tokenizer_path: str = "models/appendages",
+                 seq_len: int = 900,
+                 use_vqvae: bool = True) -> None:
         """
         AppendageDataset loading batches for tokenized appendage vectors.
         """
         super().__init__()  # initialize super class Dataset (from torch)
 
         self.region_tokenizer = RegionTokenizer(region_tokenizer_path)
+
+        # import
+        self.vqvae = VQVAE(input_dim=12, codebook_size=512, embedding_dim=1024)
+        vqvae_state_dict = torch.load(vqvae_path, map_location="cuda")
+        self.vqvae.load_state_dict(vqvae_state_dict["model"])
+        self.vqvae.to("cuda")
+        self.vqvae.eval()
+        self.use_vqvae = use_vqvae
 
         self.train_data = np.load(f"{data_path}/training_dataset.npy")
         self.val_data = np.load(f"{data_path}/validation_dataset.npy")
@@ -36,7 +50,7 @@ class AppendageDataset(Dataset):
         # start at 0, go up to len(self.regions), and step by seq_len (30 seconds of data)
         for i in range(0, len(self.region_tokens), seq_len):
             region = self.region_tokens[i: i + seq_len]  # shape: (seq_len,)
-            appendage = self.app_data[i: i + seq_len]  # shape: (seq_len,)
+            appendage = self.app_data[i: i + seq_len]  # shape: (seq_len, 12)
 
             # all regions are length seq_len
             if len(region) == seq_len and len(appendage) == seq_len:  # redundant
@@ -61,4 +75,11 @@ class AppendageDataset(Dataset):
         which converts to:
             b = dataset.__getitem__(0)
         """
-        return self.regions[index], self.appendages[index]
+
+        # returning (1, T) of vqvae tokens to input into PositionLLM
+        # returning (T, 12) of appendage values
+        if self.use_vqvae:
+            with torch.no_grad():
+                return self.vqvae(torch.tensor(self.appendages[index]).unsqueeze(0).to("cuda").to(torch.float32), return_toks=True).squeeze(0).cpu().numpy(), self.appendages[index]
+        else:
+            return self.regions[index], self.appendages[index]

@@ -48,12 +48,12 @@ class VQVAEEncoder(nn.Module):
         x = self.linear(x) # B, T, C
         z_e = self.encoder(x) # B, T, C
 
-        dist = torch.cdist(z_e, self.codebook.weight, p=2.0)
+        dist = torch.cdist(z_e, self.codebook.weight, p=2.0) # B, T, C
 
-        q_token_ids = torch.argmin(dist, dim=-1)
+        q_token_ids = torch.argmin(dist, dim=-1) # B, T
 
         if return_toks:
-            return q_token_ids # (B, T)
+            return q_token_ids # B, T
 
         # EMA update
         z_q = self.codebook.weight[q_token_ids]
