@@ -9,12 +9,15 @@ from eeg.big_hand.position_llm.vqvae import VQVAE
 
 
 class AppendageDataset(Dataset):
-    def __init__(self,
-                 data_path: str = "/var/log/thavamount/eeg_dataset",
-                 vqvae_path: str = "/var/log/thavamount/eeg_ckpts/eeg_vqvae/vqvae_final_1250.pth",
-                 region_tokenizer_path: str = "models/appendages",
-                 seq_len: int = 900,
-                 use_vqvae: bool = True) -> None:
+    def __init__(
+        self,
+        data_path: str = "/var/log/thavamount/eeg_dataset",
+        vqvae_path: str = "/var/log/thavamount/eeg_ckpts/eeg_vqvae/vqvae_final_1250.pth",
+        region_tokenizer_path: str = "models/appendages",
+        seq_len: int = 900,
+        use_vqvae: bool = True,
+        duration_prediction: bool = False,
+    ) -> None:
         """
         AppendageDataset loading batches for tokenized appendage vectors.
         """
@@ -43,6 +46,8 @@ class AppendageDataset(Dataset):
 
         self.app_data = self.region_tokenizer.scaler.transform(self.app_data)
 
+        self.duration_prediction = duration_prediction
+
         # regions will be a list of region sequences, each with shape (64,)
         self.regions = []
         self.appendages = []
@@ -56,6 +61,7 @@ class AppendageDataset(Dataset):
             if len(region) == seq_len and len(appendage) == seq_len:  # redundant
                 self.regions.append(region)
                 self.appendages.append(appendage)
+        
 
     def __len__(self) -> int:
         return len(self.regions)
@@ -79,7 +85,68 @@ class AppendageDataset(Dataset):
         # returning (1, T) of vqvae tokens to input into PositionLLM
         # returning (T, 12) of appendage values
         if self.use_vqvae:
-            with torch.no_grad():
-                return self.vqvae(torch.tensor(self.appendages[index]).unsqueeze(0).to("cuda").to(torch.float32), return_toks=True).squeeze(0).cpu().numpy(), self.appendages[index]
+            vqvae_tokens = self.vqvae(torch.tensor(self.appendages[index]).unsqueeze(0).to("cuda").to(torch.float32), return_toks=True)
+            vqvae_tokens = vqvae_tokens.squeeze(0).cpu().numpy()
+
+            if not self.duration_prediction:
+                with torch.no_grad():
+                    return vqvae_tokens, self.appendages[index]
+            else:
+                # vqvae_tokens, appendage_values, durations, mask
+                # vqvae_tokens: (T,)
+                reversed_vqvae_toks = vqvae_tokens[::-1]
+                durations = [1]
+                for i in range(1, len(reversed_vqvae_toks)):
+                    # counting backwards
+                    current_tok = reversed_vqvae_toks[i]
+                    prev_tok = reversed_vqvae_toks[i - 1]
+
+                    if prev_tok == current_tok:
+                        durations.append(durations[-1] + 1)
+                    else:
+                        durations.append(1)
+                
+                durations = durations[::-1]
+
+                masks = [1]
+                for i in range(len(vqvae_tokens) - 1):
+                    current_tok = vqvae_tokens[i]
+                    next_tok = vqvae_tokens[i + 1]
+
+                    if next_tok == current_tok:
+                        masks.append(0)
+                    else:
+                        masks.append(1)
+                
+                return {
+                    "tokens": vqvae_tokens,
+                    "values": self.appendages[index],
+                    "durations": durations,
+                    "masks": masks
+                }
+
         else:
             return self.regions[index], self.appendages[index]
+
+    def collate_fn(batch):
+        """
+        Collate function to be used with DataLoader to batch data.
+        """
+
+        if isinstance(batch[0], dict):
+            region_tokens = torch.tensor([item["tokens"] for item in batch]).to(torch.int64)  # (B, T)
+            appendage_values = torch.tensor([item["values"] for item in batch]).to(torch.float32)  # (B, T, 12)
+            durations = torch.tensor([item["durations"] for item in batch]).to(torch.float32)  # (B, T)
+            masks = torch.tensor([item["masks"] for item in batch]).to(torch.float32)  # (B, T)
+
+            return {
+                "tokens": region_tokens,
+                "values": appendage_values,
+                "durations": durations,
+                "masks": masks
+            }
+
+        region_tokens = torch.tensor([item[0] for item in batch]).to(torch.int64)  # (B, T)
+        appendage_values = torch.tensor([item[1] for item in batch]).to(torch.float32)  # (B, T, 12)
+
+        return region_tokens, appendage_values

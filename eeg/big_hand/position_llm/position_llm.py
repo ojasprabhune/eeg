@@ -74,6 +74,7 @@ class PositionLLM(nn.Module):
         value_length: int,
         max_length: int,
         dropout: float,
+        duration_prediction: bool = False
     ) -> None:
         super().__init__()
 
@@ -86,6 +87,7 @@ class PositionLLM(nn.Module):
         self.ffn_hidden_dim = ffn_hidden_dim
         self.qk_length = qk_length
         self.value_length = value_length
+        self.duration_prediction = duration_prediction
 
         # layers
 
@@ -109,6 +111,9 @@ class PositionLLM(nn.Module):
             embedding_dim, dropout, max_length
         )
         self.dropout = nn.Dropout(p=dropout)
+
+        if self.duration_prediction:
+            self.duration_prediction_linear = nn.Linear(embedding_dim, 1)
 
     def make_mask(self, x: torch.Tensor) -> torch.Tensor:
         # dictionary of input embeddings
@@ -134,6 +139,13 @@ class PositionLLM(nn.Module):
         for positionllm_layer in self.positionllm_layers:
             x = positionllm_layer(x, decoder_mask)
 
-        x = self.linear(x)
+        # distribution over vocab size
+        vocab_distribution = self.linear(x)
 
-        return x
+        if self.duration_prediction:
+            # x: (B, T, C)
+            duration = self.duration_prediction_linear(x).squeeze(-1) # (B, T)
+            return vocab_distribution, duration # (B, T, vocab_size), (B, T)
+
+        return vocab_distribution
+

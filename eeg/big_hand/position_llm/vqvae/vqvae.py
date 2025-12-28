@@ -23,3 +23,10 @@ class VQVAE(nn.Module):
             x = self.decoder(z_q)
         
             return x, z_e, z_q
+
+    def decode(self, toks: torch.Tensor):
+
+        z_q = self.encoder.codebook(toks)
+        x = self.decoder(z_q)
+
+        return x
