@@ -6,12 +6,12 @@ hyperparameters:
   vocab_size: 512
   num_layers: 4
   num_heads: 4
-  embedding_dim: 64
-  ffn_hidden_dim: 64
-  qk_length: 64
-  value_length: 64
+  embedding_dim: 256
+  ffn_hidden_dim: 256
+  qk_length: 256
+  value_length: 256
   max_length: 2048
   dropout: 0.1
   duration_prediction: True
-  lambda_duration: 5
-  run_name: VQVAE_big_hand
+  lambda_duration: 1
+  run_name: log_pos_llm_duration_256_tril_fix_lambda_1

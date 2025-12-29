@@ -123,7 +123,7 @@ class PositionLLM(nn.Module):
 
         B, T, C = x.size()
         ones = torch.ones((1, T, T))
-        out = torch.tril(ones, 1)
+        out = torch.tril(ones, 0)
 
         return out.to(x.device)
 

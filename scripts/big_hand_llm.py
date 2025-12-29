@@ -14,12 +14,12 @@ from tqdm import tqdm
 
 from eeg.big_hand.position_llm import PositionLLM, AppendageDataset
 
-with open("config/positionllm.yaml", "r") as config_file:
+with open("config/log_position_llm.yaml", "r") as config_file:
     config = yaml.safe_load(config_file)
 
     batch_size = config["hyperparameters"]["batch_size"]
     warmup_steps = config["hyperparameters"]["warmup_steps"]
-    base_lr = config["hyperparameters"]["base_lr"]
+    base_lr = float(config["hyperparameters"]["base_lr"])
     epochs = config["hyperparameters"]["epochs"]
     vocab_size = config["hyperparameters"]["vocab_size"]
     num_layers = config["hyperparameters"]["num_layers"]
@@ -126,15 +126,21 @@ def train():
             token_logits = token_logits.transpose(1, 2)
 
             token_loss = class_loss_fn(token_logits, gt_tokens)
-            token_loss = (token_loss * masks[:, 1:]).mean()
+            token_loss = (token_loss * masks[:, 1:]).sum() / (masks[:, 1:].sum() + 1e-8)
 
             duration_loss = duration_loss_fn(duration_preds, durations[:, 1:])
-            duration_loss = (duration_loss * masks[:, 1:]).mean()
+            duration_loss = (duration_loss * masks[:, 1:]).sum() / (masks[:, 1:].sum() + 1e-8)
 
             total_loss = token_loss + lambda_duration * duration_loss
 
-            iter_tqdm.set_postfix({"loss": total_loss.item()})
-            run.log({"loss": total_loss.item()})
+            loss_report = {
+                "loss": total_loss.item(),
+                "token_loss": token_loss.item(),
+                "duration_loss": duration_loss.item()
+            }
+
+            iter_tqdm.set_postfix(loss_report)
+            run.log(loss_report)
 
             optimizer.zero_grad()  # optimizer has access to all model params, makes grads 0
             total_loss.backward()  # calculates and adds gradients to params so optim sees
@@ -150,7 +156,7 @@ def train():
             }
 
             torch.save(
-                latest_ckpt, f"/var/log/thavamount/eeg_ckpts/hand_lm/posllm_log_duration_prediction.pth")
+                latest_ckpt, f"/var/log/thavamount/eeg_ckpts/hand_lm/{run_name}.pth")
 
         elif i % 5000 == 0:
             checkpoint = {
@@ -161,7 +167,7 @@ def train():
             }
 
             torch.save(
-                checkpoint, f"/var/log/thavamount/eeg_ckpts/hand_lm/log_checkpoint_{i}.pth")
+                checkpoint, f"/var/log/thavamount/eeg_ckpts/hand_lm/{run_name}_checkpoint_{i}.pth")
 
     run.finish()
 

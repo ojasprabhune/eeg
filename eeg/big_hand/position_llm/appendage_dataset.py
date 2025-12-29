@@ -1,3 +1,4 @@
+from tqdm import tqdm
 import numpy as np
 import torch
 from torch.utils.data import Dataset
@@ -48,19 +49,42 @@ class AppendageDataset(Dataset):
 
         self.duration_prediction = duration_prediction
 
+        # Precompute VQVAE tokens
+        self.vqvae_tokens_all = None
+        if self.use_vqvae:
+            print("Pre-computing VQ-VAE tokens...")
+            self.vqvae_tokens_all = []
+            chunk_size = 2048  # Process in chunks
+            with torch.no_grad():
+                for i in tqdm(range(0, len(self.app_data), chunk_size)):
+                    chunk = self.app_data[i : i + chunk_size]
+                    chunk_tensor = (
+                        torch.tensor(chunk, dtype=torch.float32)
+                        .to("cuda")
+                        .unsqueeze(0)
+                    )
+                    tokens = self.vqvae(chunk_tensor, return_toks=True)
+                    self.vqvae_tokens_all.append(tokens.cpu().numpy().flatten())
+            self.vqvae_tokens_all = np.concatenate(self.vqvae_tokens_all)
+
         # regions will be a list of region sequences, each with shape (64,)
         self.regions = []
         self.appendages = []
+        self.vqvae_token_crops = []
 
         # start at 0, go up to len(self.regions), and step by seq_len (30 seconds of data)
         for i in range(0, len(self.region_tokens), seq_len):
-            region = self.region_tokens[i: i + seq_len]  # shape: (seq_len,)
-            appendage = self.app_data[i: i + seq_len]  # shape: (seq_len, 12)
+            region = self.region_tokens[i : i + seq_len]  # shape: (seq_len,)
+            appendage = self.app_data[i : i + seq_len]  # shape: (seq_len, 12)
 
             # all regions are length seq_len
             if len(region) == seq_len and len(appendage) == seq_len:  # redundant
                 self.regions.append(region)
                 self.appendages.append(appendage)
+                if self.use_vqvae:
+                    self.vqvae_token_crops.append(
+                        self.vqvae_tokens_all[i : i + seq_len]
+                    )
         
 
     def __len__(self) -> int:
@@ -85,40 +109,36 @@ class AppendageDataset(Dataset):
         # returning (1, T) of vqvae tokens to input into PositionLLM
         # returning (T, 12) of appendage values
         if self.use_vqvae:
-            vqvae_tokens = self.vqvae(torch.tensor(self.appendages[index]).unsqueeze(0).to("cuda").to(torch.float32), return_toks=True)
-            vqvae_tokens = vqvae_tokens.squeeze(0).cpu().numpy()
+            vqvae_tokens = self.vqvae_token_crops[index]
 
             if not self.duration_prediction:
-                with torch.no_grad():
-                    return vqvae_tokens, self.appendages[index]
+                return vqvae_tokens, self.appendages[index]
             else:
                 # vqvae_tokens, appendage_values, durations, mask
                 # vqvae_tokens: (T,)
-                
-                # Vectorized duration calculation
-                # Find where tokens change (going backwards)
                 reversed_vqvae_toks = vqvae_tokens[::-1]
-                token_changes = np.concatenate([[True], reversed_vqvae_toks[1:] != reversed_vqvae_toks[:-1]])
+                durations = [1]
+                for i in range(1, len(reversed_vqvae_toks)):
+                    # counting backwards
+                    current_tok = reversed_vqvae_toks[i]
+                    prev_tok = reversed_vqvae_toks[i - 1]
+
+                    if prev_tok == current_tok:
+                        durations.append(durations[-1] + 1)
+                    else:
+                        durations.append(1)
                 
-                # Calculate run lengths
-                run_lengths = np.zeros(len(reversed_vqvae_toks), dtype=np.float32)
-                current_length = 1
-                for i in range(len(reversed_vqvae_toks)):
-                    if token_changes[i]:
-                        current_length = 1
-                    run_lengths[i] = current_length
-                    current_length += 1
-                
-                # Apply log10 transform and reverse back
-                durations = np.log10(run_lengths)
                 durations = durations[::-1]
-                
-                # Vectorized mask calculation
-                # mask is 1 when next token is different, 0 when same
-                masks = np.concatenate([
-                    vqvae_tokens[:-1] != vqvae_tokens[1:],  # 1 where tokens differ
-                    [True]  # last position always gets mask=1
-                ]).astype(np.float32)
+
+                masks = [1]
+                for i in range(len(vqvae_tokens) - 1):
+                    current_tok = vqvae_tokens[i]
+                    next_tok = vqvae_tokens[i + 1]
+
+                    if next_tok == current_tok:
+                        masks.append(0)
+                    else:
+                        masks.append(1)
                 
                 return {
                     "tokens": vqvae_tokens,
@@ -136,10 +156,10 @@ class AppendageDataset(Dataset):
         """
 
         if isinstance(batch[0], dict):
-            region_tokens = torch.tensor(np.array([item["tokens"] for item in batch])).to(torch.int64)  # (B, T)
-            appendage_values = torch.tensor(np.array([item["values"] for item in batch])).to(torch.float32)  # (B, T, 12)
-            durations = torch.tensor(np.array([item["durations"] for item in batch])).to(torch.float32)  # (B, T)
-            masks = torch.tensor(np.array([item["masks"] for item in batch])).to(torch.float32)  # (B, T)
+            region_tokens = torch.tensor([item["tokens"] for item in batch]).to(torch.int64)  # (B, T)
+            appendage_values = torch.tensor([item["values"] for item in batch]).to(torch.float32)  # (B, T, 12)
+            durations = torch.tensor([item["durations"] for item in batch]).to(torch.float32)  # (B, T)
+            masks = torch.tensor([item["masks"] for item in batch]).to(torch.float32)  # (B, T)
 
             return {
                 "tokens": region_tokens,
