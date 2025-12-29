@@ -8,7 +8,7 @@ import torch
 import wandb
 from torch.nn import CrossEntropyLoss, L1Loss
 from torch.optim import AdamW
-from torch.optim.lr_scheduler import LambdaLR
+from torch.optim.lr_scheduler import LambdaLR, LRScheduler
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -33,6 +33,8 @@ with open("config/log_position_llm.yaml", "r") as config_file:
     duration_prediction = config["hyperparameters"]["duration_prediction"]
     lambda_duration = config["hyperparameters"]["lambda_duration"]
     run_name = config["hyperparameters"]["run_name"]
+    use_ckpt_path = config["hyperparameters"]["use_ckpt_path"]
+    save_ckpt_path = config["hyperparameters"]["save_ckpt_path"]
 
 appendage_dataset: AppendageDataset = AppendageDataset(
     duration_prediction=True)
@@ -86,6 +88,23 @@ duration_loss_fn = L1Loss(reduction="none")
 
 model.to(device)
 
+if use_ckpt_path is not None:
+    print(f"Loading checkpoint from {use_ckpt_path}")
+    state_dict = torch.load(use_ckpt_path, map_location=device)
+    model.load_state_dict(state_dict["model"])
+    optimizer.load_state_dict(state_dict["optimizer"])
+    # scheduler.load_state_dict(state_dict["scheduler"])
+    scheduler = LambdaLR(optimizer, lr_lambda=lr_lambda)
+
+    print("Freezing everything except duration prediction head.")
+    model.embedding.weight.requires_grad = False
+    for i, module in enumerate(model.positionllm_layers):
+        if i < len(model.positionllm_layers) - 1:
+            for param in module.parameters():
+                param.requires_grad = False
+    # model.linear.weight.requires_grad = False
+    # model.linear.bias.requires_grad = False
+
 
 def train():
     # start a new wandb run to track this script.
@@ -126,10 +145,12 @@ def train():
             token_logits = token_logits.transpose(1, 2)
 
             token_loss = class_loss_fn(token_logits, gt_tokens)
-            token_loss = (token_loss * masks[:, 1:]).sum() / (masks[:, 1:].sum() + 1e-8)
+            token_loss = (
+                token_loss * masks[:, 1:]).sum() / (masks[:, 1:].sum() + 1e-8)
 
             duration_loss = duration_loss_fn(duration_preds, durations[:, 1:])
-            duration_loss = (duration_loss * masks[:, 1:]).sum() / (masks[:, 1:].sum() + 1e-8)
+            duration_loss = (
+                duration_loss * masks[:, 1:]).sum() / (masks[:, 1:].sum() + 1e-8)
 
             total_loss = token_loss + lambda_duration * duration_loss
 
@@ -156,7 +177,7 @@ def train():
             }
 
             torch.save(
-                latest_ckpt, f"/var/log/thavamount/eeg_ckpts/hand_lm/{run_name}.pth")
+                latest_ckpt, save_ckpt_path)
 
         elif i % 5000 == 0:
             checkpoint = {
@@ -167,7 +188,7 @@ def train():
             }
 
             torch.save(
-                checkpoint, f"/var/log/thavamount/eeg_ckpts/hand_lm/{run_name}_checkpoint_{i}.pth")
+                checkpoint, f"/var/log/thavamount/eeg_ckpts/hand_lm/{run_name}_epoch_{i}.pth")
 
     run.finish()
 

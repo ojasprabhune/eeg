@@ -33,7 +33,8 @@ class PositionLLMLayer(nn.Module):
         # layers
 
         self.dropout = nn.Dropout(p=dropout)
-        self.MHA = MultiHeadAttention(num_heads, embedding_dim, qk_length, value_length)
+        self.MHA = MultiHeadAttention(
+            num_heads, embedding_dim, qk_length, value_length)
         self.FFN = FeedForwardNN(embedding_dim, ffn_hidden_dim)
         self.norm1 = nn.LayerNorm(embedding_dim)
         self.norm2 = nn.LayerNorm(embedding_dim)
@@ -113,7 +114,14 @@ class PositionLLM(nn.Module):
         self.dropout = nn.Dropout(p=dropout)
 
         if self.duration_prediction:
-            self.duration_prediction_linear = nn.Linear(embedding_dim, 1)
+            self.duration_prediction_linear1 = nn.Linear(
+                embedding_dim, embedding_dim)
+            self.duration_prediction_linear2 = nn.Linear(
+                embedding_dim, embedding_dim)
+            self.duration_prediction_linear3 = nn.Linear(
+                embedding_dim, embedding_dim)
+            self.duration_prediction_linear4 = nn.Linear(embedding_dim, 1)
+            self.relu = nn.ReLU()
 
     def make_mask(self, x: torch.Tensor) -> torch.Tensor:
         # dictionary of input embeddings
@@ -131,7 +139,8 @@ class PositionLLM(nn.Module):
         sequence_embedding = self.embedding(x)  # (B, T, C)
         decoder_mask = self.make_mask(sequence_embedding)
         # print(f"emb shape: {sequence_embedding.shape}")
-        x = self.positional_encoding(sequence_embedding)  # add positional information
+        # add positional information
+        x = self.positional_encoding(sequence_embedding)
         # print(f"posenc shape: {x.shape}")
         x = self.dropout(x)
 
@@ -144,8 +153,15 @@ class PositionLLM(nn.Module):
 
         if self.duration_prediction:
             # x: (B, T, C)
-            duration = self.duration_prediction_linear(x).squeeze(-1) # (B, T)
-            return vocab_distribution, duration # (B, T, vocab_size), (B, T)
+            duration = self.duration_prediction_linear1(x)
+            duration = self.relu(duration)
+            duration = self.duration_prediction_linear2(duration)
+            duration = self.relu(duration)
+            duration = self.duration_prediction_linear3(duration)
+            duration = self.relu(duration)
+            duration = self.duration_prediction_linear4(
+                duration).squeeze(-1)  # (B, T)
+
+            return vocab_distribution, duration  # (B, T, vocab_size), (B, T)
 
         return vocab_distribution
-
