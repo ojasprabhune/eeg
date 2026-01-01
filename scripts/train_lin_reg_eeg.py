@@ -33,7 +33,7 @@ device = "cuda"
 model = EEGRegressionModel(14, 12)
 optimizer = AdamW(model.parameters(), lr=base_lr, betas=[0.9, 0.98], eps=1e-9)
 
-class_loss_fn = CrossEntropyLoss()
+loss_fn = L1Loss()
 
 model.to(device)
 
@@ -62,18 +62,18 @@ def train():
         iter_tqdm = tqdm(eeg_dataloader, dynamic_ncols=True)
         for batch in iter_tqdm:
 
-            eegs = batch["eegs"]  # (B, T, num_eeg_channels)
-            app_values = batch["values"]  # (B, T, 12)
+            eegs = batch[2]  # (B, T, num_eeg_channels)
+            app_values = batch[1]  # (B, T, 12)
 
             eegs = eegs.to(device)
             app_values = app_values.to(device)
 
             pred_app_values = model(eegs)  # (B, T, 12)
 
-            loss = class_loss_fn(pred_app_values, app_values)
+            loss = loss_fn(pred_app_values, app_values)
 
-            iter_tqdm.set_postfix(loss)
-            run.log(loss)
+            iter_tqdm.set_postfix({"loss": loss.item()})
+            run.log({"loss": loss.item()})
 
             optimizer.zero_grad()  # optimizer has access to all model params, makes grads 0
             loss.backward()  # calculates and adds gradients to params so optim sees

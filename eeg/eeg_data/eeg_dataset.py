@@ -184,7 +184,6 @@ class EEGDataset(Dataset):
                     "durations": durations,
                     "masks": masks,
                     "eegs": self.eegs[index],
-                    "eegs": self.eegs[index]
                 }
 
         else:
@@ -222,7 +221,7 @@ class EEGDataset(Dataset):
             [item[0] for item in batch]).to(torch.int64)  # (B, T)
         appendage_values = torch.tensor(
             [item[1] for item in batch]).to(torch.float32)  # (B, T, 12)
-        eeg_values = torch.tensor(
+        eeg_values = torch.stack(
             # (B, T, num_eeg_channels)
             [item[2] for item in batch]).to(torch.float32)
 

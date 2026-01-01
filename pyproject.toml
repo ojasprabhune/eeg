@@ -24,6 +24,7 @@ dependencies = [
     "scikit-learn>=1.7.2",
     "seaborn>=0.13.2",
     "torch>=2.7.1",
+    "torchaudio>=2.7.1",
     "tqdm>=4.67.1",
     "wandb>=0.22.3",
 ]
