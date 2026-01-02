@@ -1,0 +1,4 @@
+hyperparameters:
+  base_lr: 1e-4
+  epochs: 1000
+  run_name: basic_labram

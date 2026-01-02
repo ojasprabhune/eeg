@@ -1,4 +1,4 @@
 hyperparameters:
-  base_lr: 5e-5
+  base_lr: 1e-3
   epochs: 1000
   run_name: eeg_regression

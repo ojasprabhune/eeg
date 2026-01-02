@@ -8,7 +8,7 @@ class EEGRegressionModel(nn.Module):
                  output_dim: int):
         """
         Docstring for __init__
-
+        
         :param self: Description
         :param input_dim: Description
         :type input_dim: int

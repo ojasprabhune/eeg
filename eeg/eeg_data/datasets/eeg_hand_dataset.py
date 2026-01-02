@@ -1,6 +1,8 @@
+import mne
+import numpy as np
+
 import torch
 import torchaudio
-import mne
 from torch.utils.data import Dataset
 
 mne.set_log_level("WARNING") # to suppress info messages
@@ -9,6 +11,8 @@ class HandDataset(Dataset):
     def __init__(
         self,
         num_folders: int,
+        new_sfreq: int = 200,
+        label_sfreq: int = 50,
         data_path: str = "/var/log/thavamount/eeg_dataset/motor_eeg/1.0.0",
         seq_len: int = 800,
     ) -> None:
@@ -27,6 +31,7 @@ class HandDataset(Dataset):
                     f"{data_path}/S00{i + 1}/S00{i + 1}R{j}.edf", preload=True))
 
         self.raw: mne.io.Raw = mne.concatenate_raws(self.raws, preload=True)
+        self.events, self.event_ids = mne.events_from_annotations(self.raw)
 
         # band-pass filter
         self.filtered = self.raw.copy().filter(l_freq=0.1, h_freq=75)
@@ -35,22 +40,43 @@ class HandDataset(Dataset):
         self.filtered = self.filtered.notch_filter(freqs=60)
 
         # sampling frequency
-        orig_sr = 160
-        new_sr = 200
+        self.resampled, self.events = self.filtered.copy().resample(sfreq=new_sfreq, events=self.events)
+        self.resampled_label, self.events_label = self.filtered.copy().resample(sfreq=label_sfreq, events=self.events)
 
-        self.resampler = torchaudio.transforms.Resample(orig_freq=orig_sr, new_freq=new_sr)
-        self.resampled = self.resampler(torch.tensor(self.filtered.get_data()).float())
+        self.eeg_data = self.resampled.get_data()
+        self.events_label = np.delete(self.events_label, 1, axis=1) # every row: (sample, event_id)
+
+        self.labels = np.zeros(self.eeg_data.shape[-1], dtype=np.int64)
+
+        for i in range(len(self.events_label)):
+            if i == len(self.events_label) - 1:
+                ts = self.events_label[i, 0]
+                self.labels[ts:] = self.events_label[i, 1] - 1
+            else:
+                ts = self.events_label[i, 0]
+                next_ts = self.events_label[i+1, 0]
+                self.labels[ts:next_ts] = self.events_label[i, 1] - 1
 
         # --- chunking ---
         self.chunks = []
+        self.label_chunks = []
+
+        self.label_seq_len = seq_len // (new_sfreq // label_sfreq)
 
         # start at 0, go up to len(self.resampled[-1]), and step by seq_len
-        for i in range(0, len(self.resampled[-1]), seq_len):
-            chunk = self.resampled[:, i : i + seq_len] # C, seq_len
+        for i in range(0, len(self.eeg_data[-1]), seq_len):
+            chunk = self.eeg_data[:, i : i + seq_len] # C, seq_len
 
             # all chunks are length seq_len except maybe last
             if len(chunk[-1]) == seq_len:
                 self.chunks.append(chunk)
+
+        for i in range(0, self.labels.shape[-1], self.label_seq_len):
+            label_chunk = self.labels[i : i + self.label_seq_len] # seq_len
+
+            # all chunks are length seq_len except maybe last
+            if label_chunk.shape[-1] == self.label_seq_len:
+                self.label_chunks.append(label_chunk)
 
 
     def __len__(self) -> int:
@@ -73,4 +99,4 @@ class HandDataset(Dataset):
             b = dataset.__getitem__(0)
         """
 
-        return self.chunks[index]
+        return self.chunks[index], self.label_chunks[index]
