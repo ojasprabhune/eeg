@@ -1,67 +1,15 @@
+import math
+
 import torch
 import torch.nn as nn
 
-from .transformer.attention import FeedForwardNN, MultiHeadAttention
-from .transformer.encoder import PositionalEncoding
 from .transformer.decoder import Decoder
-
-
-class EEGLLMLayer(nn.Module):
-    """
-
-    """
-
-    def __init__(
-        self,
-        num_heads: int,
-        embedding_dim: int,
-        ffn_hidden_dim: int,
-        qk_length: int,
-        value_length: int,
-        dropout: float,
-    ) -> None:
-        super().__init__()
-
-        # instance attributes
-
-        self.num_heads = num_heads
-        self.embedding_dim = embedding_dim
-        self.ffn_hidden_dim = ffn_hidden_dim
-        self.qk_length = qk_length
-        self.value_length = value_length
-
-        # layers
-
-        self.dropout = nn.Dropout(p=dropout)
-        self.MHA = MultiHeadAttention(
-            num_heads, embedding_dim, qk_length, value_length)
-        self.FFN = FeedForwardNN(embedding_dim, ffn_hidden_dim)
-        self.norm1 = nn.LayerNorm(embedding_dim)
-        self.norm2 = nn.LayerNorm(embedding_dim)
-
-    def forward(self, x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
-        Q, K, V = x, x, x  # copies of input embedding
-
-        # multi head attention
-        residual_x = x
-        x = self.MHA(Q, K, V, mask)
-        x = self.dropout(x)
-        x += residual_x
-        x = self.norm1(x)
-
-        # feed forward network
-        residual_x = x
-        x = self.FFN(x)
-        x = self.dropout(x)
-        x += residual_x
-        x = self.norm2(x)
-
-        return x
+from braindecode.models import Labram 
 
 
 class EEGLLM(nn.Module):
     """
-    Essentially a TransformerDecoder without cross-attention.
+    EEGLLM that computes appendage values.
     """
 
     def __init__(
@@ -74,11 +22,18 @@ class EEGLLM(nn.Module):
         qk_length: int,
         value_length: int,
         max_length: int,
+
+        num_channels: int,
+        num_times: int,
+        num_outputs: int,
+
         dropout: float,
     ) -> None:
-        super().__init__()
+        """
 
-        # instance attributes
+        """
+
+        super().__init__()
 
         self.vocab_size = vocab_size
         self.num_layers = num_layers
@@ -87,56 +42,50 @@ class EEGLLM(nn.Module):
         self.ffn_hidden_dim = ffn_hidden_dim
         self.qk_length = qk_length
         self.value_length = value_length
+        self.max_length = max_length
 
-        # layers
+        self.num_channels = num_channels
+        self.num_times = num_times
+        self.num_outputs = num_outputs
 
-        # dictionary of token embeddings
-        self.embedding = nn.Embedding(vocab_size, embedding_dim)
-        self.eegllm_layers = nn.ModuleList(
-            [
-                EEGLLMLayer(
-                    num_heads,
-                    embedding_dim,
-                    ffn_hidden_dim,
-                    qk_length,
-                    value_length,
-                    dropout,
-                )
-                for _ in range(num_layers)
-            ]
-        )
-        self.linear = nn.Linear(embedding_dim, vocab_size)
-        self.positional_encoding = PositionalEncoding(
-            embedding_dim, dropout, max_length
-        )
-        self.dropout = nn.Dropout(p=dropout)
+        self.dropout = dropout
 
-    def make_mask(self, x: torch.Tensor) -> torch.Tensor:
-        # dictionary of input embeddings
+        # --- LaBraM ---
+        self.labram = Labram(n_chans=num_channels, n_times=num_times, n_outputs=num_outputs)
+        self.pretrained_state = torch.load("scripts/models/labram_nc64_nt800_backbone.pt", map_location="cpu")
+        self.labram.load_state_dict(self.pretrained_state)       
+
+        # freeze labram parameters
+        for param in self.model.parameters():
+            param.requires_grad = False
+
+        # |x| = C * floor(t / w)
+        time_window = 200
+        num_patches = num_channels * math.floor(num_times / time_window)
+
+        self.labram_time_linear = nn.Linear(time_window, time_window)
+
+        # --- Decoder ---
+        self.decoder = Decoder(
+            vocab_size = vocab_size,
+            num_layers = num_layers,
+            num_heads = num_heads,
+            embedding_dim = embedding_dim,
+            ffn_hidden_dim = ffn_hidden_dim,
+            qk_length = qk_length,
+            value_length = value_length,
+            max_length = max_length 
+            )
+
+
+    def forward(self, x: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         """
-        Create a mask to prevent attention to future tokens.
+        EEGLLM takes in EEG data of size (B, C, T), where B is batch size, C is
+        number of channels, and T is sequence length. Returns a probability
+        distribution over appendage tokens (VQ-VAE) of size (B, T, vocab_size).
         """
+        
+        h = self.labram.forward_features(x, return_patch_tokens=True) # h: (B, num_patches, T)
+        x = self.decoder(target, h) # x: (B, T, vocab_size)
 
-        B, T, C = x.size()
-        ones = torch.ones((1, T, T))
-        out = torch.tril(ones, 0)
-
-        return out.to(x.device)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        sequence_embedding = self.embedding(x)  # (B, T, C)
-        decoder_mask = self.make_mask(sequence_embedding)
-        # print(f"emb shape: {sequence_embedding.shape}")
-        # add positional information
-        x = self.positional_encoding(sequence_embedding)
-        # print(f"posenc shape: {x.shape}")
-        x = self.dropout(x)
-
-        # process data on layers
-        for eegllm_layer in self.eegllm_layers:
-            x = eegllm_layer(x, decoder_mask)
-
-        # distribution over vocab size
-        vocab_distribution = self.linear(x)
-
-        return vocab_distribution
+        return x

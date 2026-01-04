@@ -1,6 +1,7 @@
 """
-Train a Position LLM to generalize to Ojas's hand movements. Implement all
-previous techniques like VQVAE tokenization on appendage vector components.
+Train an EEGLLM to predict to Ojas's hand movements from his brain signals.
+Implement all previous techniques like VQVAE tokenization on appendage vector
+components and LaBraM.
 """
 
 import yaml
@@ -12,43 +13,38 @@ from torch.optim.lr_scheduler import LambdaLR, LRScheduler
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from eeg.big_hand.position_llm import PositionLLM, AppendageDataset
+from eeg.eeg_data import HandDataset, EEGLLM
 
-with open("config/log_position_llm.yaml", "r") as config_file:
+with open("config/eeg_llm.yaml", "r") as config_file:
     config = yaml.safe_load(config_file)
 
-    batch_size = config["hyperparameters"]["batch_size"]
-    warmup_steps = config["hyperparameters"]["warmup_steps"]
-    base_lr = float(config["hyperparameters"]["base_lr"])
-    epochs = config["hyperparameters"]["epochs"]
-    vocab_size = config["hyperparameters"]["vocab_size"]
-    num_layers = config["hyperparameters"]["num_layers"]
-    num_heads = config["hyperparameters"]["num_heads"]
-    embedding_dim = config["hyperparameters"]["embedding_dim"]
-    ffn_hidden_dim = config["hyperparameters"]["ffn_hidden_dim"]
-    qk_length = config["hyperparameters"]["qk_length"]
-    value_length = config["hyperparameters"]["value_length"]
-    max_length = config["hyperparameters"]["max_length"]
-    dropout = config["hyperparameters"]["dropout"]
-    duration_prediction = config["hyperparameters"]["duration_prediction"]
-    lambda_duration = config["hyperparameters"]["lambda_duration"]
-    run_name = config["hyperparameters"]["run_name"]
-    use_ckpt_path = config["hyperparameters"]["use_ckpt_path"]
-    save_ckpt_path = config["hyperparameters"]["save_ckpt_path"]
+    vocab_size = config["vocab_size"]
+    num_layers = config["num_layers"]
+    num_heads = config["num_heads"]
+    embedding_dim = config["embedding_dim"]
+    ffn_hidden_dim = config["ffn_hidden_dim"]
+    qk_length = config["qk_length"]
+    value_length = config["value_length"]
+    max_length = config["max_length"]
 
-appendage_dataset: AppendageDataset = AppendageDataset(
-    duration_prediction=True)
+    num_channels = config["num_channels"]
+    num_times = config["num_times"]
+    num_outputs = config["num_outputs"]
 
-appendage_dataloader = DataLoader(appendage_dataset,
-                                  batch_size=32,
-                                  shuffle=True,
-                                  collate_fn=AppendageDataset.collate_fn)
+    dropout = config["dropout"]
 
-print(
-    f"Raw positions shape: {appendage_dataset.train_data.shape}, expected: (2, T, 63)"
-)
-print(
-    f"Appendage data shape: {appendage_dataset.app_data.shape}, expected: (T, 12)")
+    device = config["device"]
+    batch_size = config["batch_size"]
+    warmup_steps = config["warmup_steps"]
+    base_lr = float(config["base_lr"])
+    epochs = config["epochs"]
+    duration_prediction = config["duration_prediction"]
+    lambda_duration = config["lambda_duration"]
+
+    run_name = config["run_name"]
+    use_ckpt_path = config["use_ckpt_path"]
+    quit()
+    save_ckpt_path = config["save_ckpt_path"]
 
 
 def lr_lambda(step):
@@ -60,9 +56,16 @@ def lr_lambda(step):
         return (warmup_steps**0.5) / (step**0.5)
 
 
-device = "cuda"
+hand_dataset: HandDataset = HandDataset(num_folders=5, new_sfreq=200, label_sfreq=50)
 
-model = PositionLLM(
+hand_dataloader = DataLoader(
+    hand_dataloader,
+    batch_size=32,
+    shuffle=True,
+    collate_fn=HandDataset.collate_fn
+    )
+
+model = EEGLLM(
     vocab_size=vocab_size,
     num_layers=num_layers,
     num_heads=num_heads,
@@ -71,15 +74,18 @@ model = PositionLLM(
     qk_length=qk_length,
     value_length=value_length,
     max_length=max_length,
-    dropout=dropout,
-    duration_prediction=duration_prediction,
-)
+
+    num_channels = num_channels,
+    num_times = num_times,
+    num_outputs = num_outputs,
+
+    dropout=dropout
+    )
 
 optimizer = AdamW(model.parameters(), lr=base_lr, betas=[0.9, 0.98], eps=1e-9)
 scheduler = LambdaLR(optimizer, lr_lambda=lr_lambda)
 
 class_loss_fn = CrossEntropyLoss(reduction="none")
-duration_loss_fn = L1Loss(reduction="none")
 
 model.to(device)
 
@@ -99,6 +105,8 @@ if use_ckpt_path is not None:
                 param.requires_grad = False
     # model.linear.weight.requires_grad = False
     # model.linear.bias.requires_grad = False
+else:
+    print("No checkpoint found. Continuing...")
 
 
 def train():

@@ -23,7 +23,8 @@ class LabramModel(nn.Module):
                        n_outputs=num_outputs)
         self.pretrained_state = torch.load("scripts/models/labram_nc64_nt800_backbone.pt", map_location="cpu")
         self.model.load_state_dict(self.pretrained_state)       
-        
+
+        # freeze labram parameters
         for param in self.model.parameters():
             param.requires_grad = False
 
