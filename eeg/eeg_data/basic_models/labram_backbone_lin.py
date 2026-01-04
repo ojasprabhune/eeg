@@ -13,7 +13,7 @@ class LabramModel(nn.Module):
                  num_times: int = 800,
                  num_outputs: int = 0) -> None:
         """
-
+        EEGLLM with LaBraM backbone and neural network head.
         """
 
         super().__init__()
@@ -43,7 +43,7 @@ class LabramModel(nn.Module):
 
     def forward(self, x: torch.Tensor):
         """
-
+        Input is shape (B, C, T)
         """
 
         x = self.model.forward_features(x, return_patch_tokens=True) # B, num_patches, T
