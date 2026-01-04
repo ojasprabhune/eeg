@@ -9,7 +9,7 @@ from braindecode.models import Labram
 
 class EEGLLM(nn.Module):
     """
-    EEGLLM that computes appendage values.
+    EEGLLM that computes basic hand positions.
     """
 
     def __init__(
@@ -56,14 +56,14 @@ class EEGLLM(nn.Module):
         self.labram.load_state_dict(self.pretrained_state)       
 
         # freeze labram parameters
-        for param in self.model.parameters():
+        for param in self.labram.parameters():
             param.requires_grad = False
 
         # |x| = C * floor(t / w)
         time_window = 200
         num_patches = num_channels * math.floor(num_times / time_window)
 
-        self.labram_time_linear = nn.Linear(time_window, time_window)
+        self.embedding_dim_linear = nn.Linear(num_patches, embedding_dim)
 
         # --- Decoder ---
         self.decoder = Decoder(
@@ -80,12 +80,15 @@ class EEGLLM(nn.Module):
 
     def forward(self, x: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         """
-        EEGLLM takes in EEG data of size (B, C, T), where B is batch size, C is
-        number of channels, and T is sequence length. Returns a probability
-        distribution over appendage tokens (VQ-VAE) of size (B, T, vocab_size).
+        EEGLLM takes in EEG data of size (B, C, T) and a target representation,
+        where B is batch size, C is number of channels, and T is sequence
+        length. Returns a probability distribution over hand positions
+        (0, 1, 2) of size (B, T, vocab_size).
         """
-        
-        h = self.labram.forward_features(x, return_patch_tokens=True) # h: (B, num_patches, T)
-        x = self.decoder(target, h) # x: (B, T, vocab_size)
+
+        h = self.labram.forward_features(x, return_patch_tokens=True)   # h: (B, num_patches, T)
+        h = h.transpose(-1, -2)                                         # h: (B, T, num_patches)
+        h = self.embedding_dim_linear(h)                                # h: (B, T, C)
+        x = self.decoder(target, h)                                     # x: (B, T, vocab_size)
 
         return x

@@ -1,3 +1,2 @@
-from .basic_models import EEGRegressionModel, LabramModel
+from .basic_models import EEGRegressionModel, LabramModel, EEGLLM
 from .datasets import EEGDataset, HandDataset
-from .eeg_llm import EEGLLM
