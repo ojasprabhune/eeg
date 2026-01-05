@@ -136,8 +136,6 @@ def train():
 
             # shape (B, T, vocab_size of vqvae tokens), (B, T,)
             token_logits, duration_preds = model(in_tokens)
-            print(duration_preds.shape)
-            quit()
 
             # cross entropy loss expects (B, C, *additional_dims)
             token_logits = token_logits.transpose(1, 2)

@@ -28,6 +28,8 @@ class EEGLLM(nn.Module):
         num_outputs: int,
 
         dropout: float,
+
+        labram_pretrained_path: str = "scripts/models/labram_nc64_nt800_backbone.pt"
     ) -> None:
         """
 
@@ -52,7 +54,7 @@ class EEGLLM(nn.Module):
 
         # --- LaBraM ---
         self.labram = Labram(n_chans=num_channels, n_times=num_times, n_outputs=num_outputs)
-        self.pretrained_state = torch.load("scripts/models/labram_nc64_nt800_backbone.pt", map_location="cpu")
+        self.pretrained_state = torch.load(labram_pretrained_path, map_location="cuda")
         self.labram.load_state_dict(self.pretrained_state)       
 
         # freeze labram parameters

@@ -67,7 +67,7 @@ class DecoderLayer(nn.Module):
 
         # masked self attention
         residual_x = x
-        x = self.MHA(x, x, x, mask.to("cuda"))  # for self attention, QKV are copies
+        x = self.MHA(x, x, x)  # for self attention, QKV are copies
         x = self.dropout(x)
         x += residual_x
         x = self.norm1(x)

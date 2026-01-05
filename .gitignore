@@ -10,3 +10,4 @@ win_venv/
 out/
 *.egg-info/
 data/dataset/
+**wandb/*

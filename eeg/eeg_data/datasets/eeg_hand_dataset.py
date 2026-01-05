@@ -2,7 +2,6 @@ import mne
 import numpy as np
 
 import torch
-import torchaudio
 from torch.utils.data import Dataset
 
 mne.set_log_level("WARNING") # to suppress info messages
@@ -57,9 +56,25 @@ class HandDataset(Dataset):
                 next_ts = self.events_label[i+1, 0]
                 self.labels[ts:next_ts] = self.events_label[i, 1] - 1
 
+        # prepend SOS token
+        sos = torch.tensor([3])
+        self.labels = torch.cat((sos, torch.tensor(self.labels)), dim=0).numpy()
+
+        # mask
+        self.mask = [1]
+        for i in range(len(self.labels) - 1):
+            current_label = self.labels[i]
+            next_label = self.labels[i + 1]
+
+            if next_label == current_label:
+                self.mask.append(0.01)
+            else:
+                self.mask.append(0.99)
+
         # --- chunking ---
         self.chunks = []
         self.label_chunks = []
+        self.masks = []
 
         self.label_seq_len = seq_len // (new_sfreq // label_sfreq)
 
@@ -70,13 +85,15 @@ class HandDataset(Dataset):
             # all chunks are length seq_len except maybe last
             if len(chunk[-1]) == seq_len:
                 self.chunks.append(chunk)
-
         for i in range(0, self.labels.shape[-1], self.label_seq_len):
             label_chunk = self.labels[i : i + self.label_seq_len] # seq_len
+            mask = self.mask[i : i + self.label_seq_len] # seq_len
+            mask = torch.tensor(mask)
 
             # all chunks are length seq_len except maybe last
-            if label_chunk.shape[-1] == self.label_seq_len:
+            if label_chunk.shape[-1] == self.label_seq_len and len(mask) == self.label_seq_len:
                 self.label_chunks.append(label_chunk)
+                self.masks.append(mask)
 
 
     def __len__(self) -> int:
@@ -86,17 +103,6 @@ class HandDataset(Dataset):
     def __getitem__(self, index: int):
         """
         Called when we do dataset[idx]
-
-        __ means a "dunder" function for double underscore function.
-        These are typically special functions that are called with
-        special syntax. For example, __init__ is called when we
-        initialize an object:
-            E.g. a = RegionDataset(data_file="data/data.npy")
-            calls __init__ with the parameter
-        When we want to index into our object, we do:
-            b = dataset[0]
-        which converts to:
-            b = dataset.__getitem__(0)
         """
 
-        return self.chunks[index], self.label_chunks[index]
+        return self.chunks[index], self.label_chunks[index], self.masks[index]
