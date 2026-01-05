@@ -21,7 +21,7 @@ device: cuda
 batch_size: 32
 warmup_steps: 4000
 base_lr: 5e-5
-epochs: 10000
+epochs: 50
 
 run_name: eeg_basic_llm_more_mask
 # use_ckpt_path: /var/log/thavamount/eeg_ckpts/eeg_lm/eeg_llm.pth
