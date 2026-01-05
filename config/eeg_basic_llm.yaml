@@ -23,7 +23,7 @@ warmup_steps: 4000
 base_lr: 5e-5
 epochs: 10000
 
-run_name: eeg_basic_llm_mask
+run_name: eeg_basic_llm_more_mask
 # use_ckpt_path: /var/log/thavamount/eeg_ckpts/eeg_lm/eeg_llm.pth
 use_ckpt_path: None
-save_ckpt_path: /var/log/thavamount/eeg_ckpts/eeg_lm/basic_hand_dataset/eeg_basic_llm_mask
+save_ckpt_path: /var/log/thavamount/eeg_ckpts/eeg_lm/basic_hand_dataset/more_mask/eeg_basic_llm_mask

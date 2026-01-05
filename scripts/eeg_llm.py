@@ -114,7 +114,7 @@ def train():
             loss.backward()  # calculates and adds gradients to params so optim sees
             optimizer.step()  # optim looks at gradients and steps accordingly
 
-        if (i + 1) % 100 == 0:
+        if (i + 1) % 1000 == 0:
             latest_ckpt = {
                 "epochs": i,
                 "model": model.state_dict(),

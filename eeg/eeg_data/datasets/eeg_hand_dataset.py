@@ -67,9 +67,9 @@ class HandDataset(Dataset):
             next_label = self.labels[i + 1]
 
             if next_label == current_label:
-                self.mask.append(0.01)
+                self.mask.append(1e-5)
             else:
-                self.mask.append(0.99)
+                self.mask.append(1)
 
         # --- chunking ---
         self.chunks = []
