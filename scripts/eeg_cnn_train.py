@@ -12,7 +12,7 @@ with open("config/eeg_basic_cnn.yaml", "r") as config_file:
     config = yaml.safe_load(config_file)
 
     vocab_size = config["vocab_size"]
-    ffn_embedding_dim = config["embedding_dim"]
+    ffn_embedding_dim = config["ffn_embedding_dim"]
 
     device = config["device"]
     batch_size = config["batch_size"]
@@ -29,7 +29,7 @@ hand_dataset: HandDatasetCNN = HandDatasetCNN(num_folders=5)
 
 hand_dataloader = DataLoader(hand_dataset, batch_size=32, shuffle=True)
 
-model = EEGCNN(seq_len=hand_dataset.chunks[0].shape[-1])
+model = EEGCNN(seq_len=hand_dataset.eeg_chunks.shape[-1])
 
 optimizer = AdamW(model.parameters(), lr=base_lr, betas=[0.9, 0.98], eps=1e-9)
 loss_fn = CrossEntropyLoss(reduction="none")
@@ -45,7 +45,7 @@ def train():
         config={
             "learning_rate": base_lr,
             "architecture": "linear",
-            "dataset": "region_dataset",
+            "dataset": "physionet_dataset",
             "epochs": epochs,
         },
     )
@@ -55,7 +55,6 @@ def train():
     epoch_tqdm = tqdm(range(epochs), dynamic_ncols=True)
     for i in epoch_tqdm:
         epoch_tqdm.set_description(f"Epoch {i + 1}")
-
 
         iter_tqdm = tqdm(hand_dataloader, dynamic_ncols=True)
         for chunk, label_chunk, mask in iter_tqdm:

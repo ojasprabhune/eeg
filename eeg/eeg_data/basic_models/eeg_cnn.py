@@ -6,7 +6,7 @@ class EEGCNN(nn.Module):
                  seq_len,
                  num_features: int = 40,
                  kernel_size_temporal: int = 30,
-                 kernel_size_spatial: int = 14,
+                 kernel_size_spatial: int = 64,
                  kernel_size_avg_pool: int = 15,
                  ffn_embedding_dim: int = 80,
                  vocab_size: int = 4) -> None:

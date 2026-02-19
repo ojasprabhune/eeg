@@ -16,4 +16,4 @@ epochs: 50
 run_name: eeg_basic_cnn
 # use_ckpt_path: /var/log/thavamount/eeg_ckpts/eeg_lm/eeg_llm.pth
 use_ckpt_path: None
-save_ckpt_path: /var/log/thavamount/eeg_ckpts/eeg_lm/basic_hand_dataset/more_mask/eeg_basic_cnn
+save_ckpt_path: /var/log/thavamount/eeg_ckpts/cnn/eeg_basic_cnn
