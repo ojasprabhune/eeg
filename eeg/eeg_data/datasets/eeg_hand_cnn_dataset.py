@@ -6,14 +6,11 @@ from torch.utils.data import Dataset
 
 mne.set_log_level("WARNING") # to suppress info messages
 
-class HandDataset(Dataset):
+class HandDatasetCNN(Dataset):
     def __init__(
         self,
         num_folders: int,
-        new_sfreq: int = 200,
-        label_sfreq: int = 50,
         data_path: str = "/var/log/thavamount/eeg_dataset/motor_eeg/1.0.0",
-        seq_len: int = 800,
     ) -> None:
         """
 

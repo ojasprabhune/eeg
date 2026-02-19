@@ -1,15 +1,15 @@
 import torch
 import torch.nn as nn
 
-class EEG_CNN(nn.Module):
+class EEGCNN(nn.Module):
     def __init__(self,
+                 seq_len,
                  num_features: int = 40,
                  kernel_size_temporal: int = 30,
                  kernel_size_spatial: int = 14,
                  kernel_size_avg_pool: int = 15,
                  ffn_embedding_dim: int = 80,
-                 seq_len: int = 900,
-                 vocab_size: int = 3) -> None:
+                 vocab_size: int = 4) -> None:
         """
         EEG CNN to perform classification.
         """
@@ -35,7 +35,7 @@ class EEG_CNN(nn.Module):
 
         self.avg_pool = nn.AvgPool2d(kernel_size=(1, kernel_size_avg_pool))
 
-        flattened_features = num_features * 1 * (seq_len // kernel_size_avg_pool) # 40 * 1 * 60 = 2400
+        flattened_features = num_features * 1 * (seq_len // kernel_size_avg_pool)
 
         self.fc1 = nn.Linear(flattened_features, ffn_embedding_dim)
         self.fc2 = nn.Linear(ffn_embedding_dim, vocab_size)

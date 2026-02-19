@@ -1,0 +1,19 @@
+# eeg_cnn
+
+vocab_size: 4
+ffn_embedding_dim: 80
+
+num_channels: 64
+
+# training
+
+device: cuda
+batch_size: 32
+warmup_steps: 4000
+base_lr: 5e-5
+epochs: 50
+
+run_name: eeg_basic_cnn
+# use_ckpt_path: /var/log/thavamount/eeg_ckpts/eeg_lm/eeg_llm.pth
+use_ckpt_path: None
+save_ckpt_path: /var/log/thavamount/eeg_ckpts/eeg_lm/basic_hand_dataset/more_mask/eeg_basic_cnn
