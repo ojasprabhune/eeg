@@ -1,3 +1,3 @@
 # Python notebooks
 
-This folders contains Python notebooks used for experimenting and quickly constructing code.
+This folders contains Python notebooks used for experimenting with and quickly constructing code.
