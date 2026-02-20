@@ -63,7 +63,6 @@ class EEGCNN(nn.Module):
         x = torch.flatten(x, start_dim=1) # (B, num_flattened_features)
         
         x = self.fc1(x)
-        x = self.fc2(x)
-        x = self.softmax(x) # (B, vocab_size)
+        x = self.fc2(x) # (B, vocab_size)
 
         return x
