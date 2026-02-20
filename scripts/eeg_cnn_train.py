@@ -23,6 +23,7 @@ with open("config/eeg_basic_cnn.yaml", "r") as config_file:
     run_name = config["run_name"]
     use_ckpt_path = config["use_ckpt_path"]
     save_ckpt_path = config["save_ckpt_path"]
+    save_every = config["save_every"]
 
 
 hand_dataset: HandDatasetCNN = HandDatasetCNN(num_folders=5)
@@ -32,7 +33,7 @@ hand_dataloader = DataLoader(hand_dataset, batch_size=32, shuffle=True)
 model = EEGCNN(seq_len=hand_dataset.eeg_chunks.shape[-1])
 
 optimizer = AdamW(model.parameters(), lr=base_lr, betas=[0.9, 0.98], eps=1e-9)
-loss_fn = CrossEntropyLoss(reduction="none")
+loss_fn = CrossEntropyLoss()
 
 model.to(device)
 
@@ -57,21 +58,18 @@ def train():
         epoch_tqdm.set_description(f"Epoch {i + 1}")
 
         iter_tqdm = tqdm(hand_dataloader, dynamic_ncols=True)
-        for chunk, label_chunk, mask in iter_tqdm:
-            # chunk: (B, num_channels, T)
+        for eeg_chunk, label_chunk in iter_tqdm:
+            # eeg_chunk: (B, C, T)
+            # label_chunk: (B,)
 
-            chunk = chunk.to(device).float()
+            eeg_chunk = eeg_chunk.to(device).float()
             label_chunk = label_chunk.to(device)
-            mask = mask.to(device)
 
-            in_labels = label_chunk[:, :-1]
-            gt_labels = label_chunk[:, 1:]
+            gt_labels = label_chunk # (B,)
 
-            hand_pos_logits = model(chunk.float(), in_labels) # out: (B, T, vocab_size)
-            hand_pos_logits = hand_pos_logits.transpose(1, 2) # (B, T, vocab_size) -> (B, vocab_size, T)
+            hand_pos_logits = model(eeg_chunk) # out: (B, vocab_size)
 
             loss = loss_fn(hand_pos_logits, gt_labels)
-            loss = (loss * mask[:, 1:]).sum() / (mask[:, 1:].sum() + 1e-8)
 
             iter_tqdm.set_postfix({"loss": loss.item()})
             run.log({"loss": loss.item()})
@@ -80,7 +78,7 @@ def train():
             loss.backward()  # calculates and adds gradients to params so optim sees
             optimizer.step()  # optim looks at gradients and steps accordingly
 
-        if (i + 1) % 10 == 0:
+        if (i + 1) % save_every == 0:
             latest_ckpt = {
                 "epochs": i,
                 "model": model.state_dict(),

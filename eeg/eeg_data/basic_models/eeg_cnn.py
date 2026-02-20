@@ -46,6 +46,7 @@ class EEGCNN(nn.Module):
     def forward(self, x: torch.Tensor):
         """
         Input is shape (B, C, T) or (N, C, T).
+        Output is shape (B, vocab_size).
         """
 
         x = x.unsqueeze(1) # (N, C, H, W) where C is 1 and H is num_channels
