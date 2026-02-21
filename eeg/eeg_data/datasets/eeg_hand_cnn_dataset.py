@@ -1,5 +1,3 @@
-from curses import raw
-
 import mne
 import numpy as np
 
@@ -22,12 +20,25 @@ class HandDatasetCNN(Dataset):
         # --- eeg data ---
         self.raws = []
         for i in range(num_folders):
+            subject = f"S{i+1:03d}"  # zero-pads to 3 digits (001, 002)
+
             for j in [3, 4, 7, 8]:
-                self.raws.append(mne.io.read_raw_edf(
-                    f"{data_path}/S00{i + 1}/S00{i + 1}R0{j}.edf", preload=True))
+                run = f"R{j:02d}"  # zero-pads to 2 digits (01, 02)
+                self.raws.append(
+                    mne.io.read_raw_edf(
+                        f"{data_path}/{subject}/{subject}{run}.edf",
+                        preload=True
+                    )
+                )
+
             for j in [11, 12]:
-                self.raws.append(mne.io.read_raw_edf(
-                    f"{data_path}/S00{i + 1}/S00{i + 1}R{j}.edf", preload=True))
+                run = f"R{j:02d}"
+                self.raws.append(
+                    mne.io.read_raw_edf(
+                        f"{data_path}/{subject}/{subject}{run}.edf",
+                        preload=True
+                    )
+                )
 
         self.raw: mne.io.Raw = mne.concatenate_raws(self.raws, preload=True)
         self.filtered = self.raw.copy().filter(l_freq=0.1, h_freq=75) # band-pass filter
@@ -53,16 +64,58 @@ class HandDatasetCNN(Dataset):
             else:
                 self.label_chunks.append(self.events[i, 1] - 1) # event_id - 1 to convert from 1, 2, 3 to 0, 1, 2
         
+        for i in range(0, len(self.label_chunks)):
+            if i % 2 == 0:
+                self.mask.append(1)
+            else:
+                self.mask.append(1e-9)
+
         # eeg chunks shape: (n_epochs, C, T)
         # label chunks shape: (n_epochs,)
+        # mask shape: (n_epochs,)
+
+        # --- train-val split ---
+        self.split_idx = int(self.eeg_chunks.shape[0] * 0.8)  # index at 80% on time dim
+        self.train_eeg_chunks = self.eeg_chunks[:self.split_idx, :, :]  # selecting 80%
+        self.train_label_chunks = self.label_chunks[:self.split_idx]  # selecting 80%
+        self.val_eeg_chunks = self.eeg_chunks[self.split_idx:, :, :]  # selecting 20%
+        self.val_label_chunks = self.label_chunks[self.split_idx:]  # selecting 20%
+
 
     def __len__(self) -> int:
-        return len(self.label_chunks)
+        """
+        Return the number of training data chunks.
+        """
+
+        return len(self.train_label_chunks)
 
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
         """
-        Called when we do dataset[idx]
+        Get training data chunk and corresponding label chunk based on index.
+
+        Parameters:
+            index (int): Index of the data chunk to retrieve.
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: The EEG data chunk and
+            corresponding label chunk.
+
         """
 
-        return self.eeg_chunks[index], torch.tensor(self.label_chunks[index])
+        return self.train_eeg_chunks[index], torch.tensor(self.train_label_chunks[index])
+
+    def get_validation_data(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """
+        Get validation data chunk and corresponding label chunk based on index.
+
+        Parameters:
+            index (int): Index of the data chunk to retrieve.
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: The EEG data chunk and
+            corresponding label chunk.
+
+        """
+
+        return self.val_eeg_chunks[index], torch.tensor(self.val_label_chunks[index])

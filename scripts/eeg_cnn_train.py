@@ -26,17 +26,24 @@ with open("config/eeg_basic_cnn.yaml", "r") as config_file:
     save_every = config["save_every"]
 
 
-hand_dataset: HandDatasetCNN = HandDatasetCNN(num_folders=5)
+hand_dataset_cnn: HandDatasetCNN = HandDatasetCNN(num_folders=32)
 
-hand_dataloader = DataLoader(hand_dataset, batch_size=32, shuffle=True)
+hand_dataloader = DataLoader(hand_dataset_cnn, batch_size=32, shuffle=True)
 
-model = EEGCNN(seq_len=hand_dataset.eeg_chunks.shape[-1])
+model = EEGCNN(seq_len=hand_dataset_cnn.train_eeg_chunks.shape[-1],
+               num_features=10,
+               kernel_size_temporal=10,
+               kernel_size_spatial=64,
+               kernel_size_avg_pool=10,
+               ffn_embedding_dim=10
+               )
 
 optimizer = AdamW(model.parameters(), lr=base_lr, betas=[0.9, 0.98], eps=1e-9)
 loss_fn = CrossEntropyLoss()
 
 model.to(device)
 
+val_chunk_counter = 0
 
 def train():
     run = wandb.init(
@@ -56,27 +63,34 @@ def train():
     epoch_tqdm = tqdm(range(epochs), dynamic_ncols=True)
     for i in epoch_tqdm:
         epoch_tqdm.set_description(f"Epoch {i + 1}")
+        val_chunk_counter = 0
 
         iter_tqdm = tqdm(hand_dataloader, dynamic_ncols=True)
         for eeg_chunk, label_chunk in iter_tqdm:
             # eeg_chunk: (B, C, T)
             # label_chunk: (B,)
 
+            val_eeg_chunk, val_label_chunk = hand_dataset_cnn.get_validation_data(val_chunk_counter)
+            val_eeg_chunk = torch.tensor(val_eeg_chunk).to(device).float().unsqueeze(0) # (1, C, T)
+            val_label_chunk = val_label_chunk.to(device).unsqueeze(0) # (1,)
+
             eeg_chunk = eeg_chunk.to(device).float()
             label_chunk = label_chunk.to(device)
 
-            gt_labels = label_chunk # (B,)
+            train_hand_pos_logits = model(eeg_chunk) # out: (B, vocab_size)
+            val_hand_pos_logits = model(val_eeg_chunk) # out: (1, vocab_size)
 
-            hand_pos_logits = model(eeg_chunk) # out: (B, vocab_size)
+            train_loss = loss_fn(train_hand_pos_logits, label_chunk)
+            val_loss = loss_fn(val_hand_pos_logits, val_label_chunk)
 
-            loss = loss_fn(hand_pos_logits, gt_labels)
-
-            iter_tqdm.set_postfix({"loss": loss.item()})
-            run.log({"loss": loss.item()})
+            iter_tqdm.set_postfix({"loss": train_loss.item()})
+            run.log({"train loss": train_loss.item(), "val loss": val_loss.item()})
 
             optimizer.zero_grad()  # optimizer has access to all model params, makes grads 0
-            loss.backward()  # calculates and adds gradients to params so optim sees
+            train_loss.backward()  # calculates and adds gradients to params so optim sees
             optimizer.step()  # optim looks at gradients and steps accordingly
+
+            val_chunk_counter += 1
 
         if (i + 1) % save_every == 0:
             latest_ckpt = {
