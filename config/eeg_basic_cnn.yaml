@@ -1,9 +1,7 @@
 # eeg_cnn
 
-vocab_size: 4
-ffn_embedding_dim: 80
-
-num_channels: 64
+vocab_size: 3
+ffn_embedding_dim: 10
 
 # training
 
@@ -17,4 +15,4 @@ run_name: eeg_basic_cnn
 # use_ckpt_path: /var/log/thavamount/eeg_ckpts/eeg_lm/eeg_llm.pth
 use_ckpt_path: None
 save_ckpt_path: /var/log/thavamount/eeg_ckpts/cnn/eeg_basic_cnn
-save_every: 500
+save_every: 100

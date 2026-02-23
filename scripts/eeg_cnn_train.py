@@ -32,14 +32,15 @@ hand_dataloader = DataLoader(hand_dataset_cnn, batch_size=32, shuffle=True)
 
 model = EEGCNN(seq_len=hand_dataset_cnn.train_eeg_chunks.shape[-1],
                num_features=10,
-               kernel_size_temporal=10,
+               kernel_size_temporal=30,
                kernel_size_spatial=64,
-               kernel_size_avg_pool=10,
-               ffn_embedding_dim=10
+               kernel_size_avg_pool=15,
+               ffn_embedding_dim=ffn_embedding_dim,
+               vocab_size=vocab_size
                )
 
 optimizer = AdamW(model.parameters(), lr=base_lr, betas=[0.9, 0.98], eps=1e-9)
-loss_fn = CrossEntropyLoss()
+loss_fn = CrossEntropyLoss(reduction="none")
 
 model.to(device)
 
@@ -66,22 +67,29 @@ def train():
         val_chunk_counter = 0
 
         iter_tqdm = tqdm(hand_dataloader, dynamic_ncols=True)
-        for eeg_chunk, label_chunk in iter_tqdm:
+        for eeg_chunk, label_chunk, mask in iter_tqdm:
             # eeg_chunk: (B, C, T)
             # label_chunk: (B,)
 
-            val_eeg_chunk, val_label_chunk = hand_dataset_cnn.get_validation_data(val_chunk_counter)
+            val_eeg_chunk, val_label_chunk, val_mask_ = hand_dataset_cnn.get_validation_data(val_chunk_counter)
             val_eeg_chunk = torch.tensor(val_eeg_chunk).to(device).float().unsqueeze(0) # (1, C, T)
             val_label_chunk = val_label_chunk.to(device).unsqueeze(0) # (1,)
 
             eeg_chunk = eeg_chunk.to(device).float()
             label_chunk = label_chunk.to(device)
+            mask = mask.to(device)
 
             train_hand_pos_logits = model(eeg_chunk) # out: (B, vocab_size)
             val_hand_pos_logits = model(val_eeg_chunk) # out: (1, vocab_size)
 
             train_loss = loss_fn(train_hand_pos_logits, label_chunk)
+
+            model.eval()
             val_loss = loss_fn(val_hand_pos_logits, val_label_chunk)
+            model.train()
+
+            # mask
+            train_loss = (train_loss * mask).sum() / (mask.sum() + 1e-8)
 
             iter_tqdm.set_postfix({"loss": train_loss.item()})
             run.log({"train loss": train_loss.item(), "val loss": val_loss.item()})

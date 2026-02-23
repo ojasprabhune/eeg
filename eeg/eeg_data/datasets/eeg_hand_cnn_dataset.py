@@ -13,7 +13,8 @@ class HandDatasetCNN(Dataset):
         data_path: str = "/var/log/thavamount/eeg_dataset/motor_eeg/1.0.0",
     ) -> None:
         """
-
+        Dataset for hand movement classification using EEG data. Loads and
+        preprocesses the data.
         """
         super().__init__()  # initialize super class Dataset (from torch)
 
@@ -43,6 +44,9 @@ class HandDatasetCNN(Dataset):
         self.raw: mne.io.Raw = mne.concatenate_raws(self.raws, preload=True)
         self.filtered = self.raw.copy().filter(l_freq=0.1, h_freq=75) # band-pass filter
         self.filtered = self.filtered.notch_filter(freqs=60) # notch filtering
+        self.filtered.set_eeg_reference("average", projection=False) # common average reference
+        self.filtered.filter(8, 30, method="iir", iir_params=dict(order=4, ftype="butter")) # butterworth
+
         self.eeg_data = self.filtered.get_data() # (C, T)
 
         # --- events and labels ---
@@ -56,6 +60,7 @@ class HandDatasetCNN(Dataset):
         # --- chunking ---
         self.eeg_chunks = self.epochs # (n_epochs, C, T)
         self.label_chunks = []
+        self.mask = []
 
         # start at 0 and go up to total number of events 
         for i in range(0, self.events.shape[0]):
@@ -66,18 +71,20 @@ class HandDatasetCNN(Dataset):
         
         for i in range(0, len(self.label_chunks)):
             if i % 2 == 0:
-                self.mask.append(1)
+                self.mask.append(5)
             else:
-                self.mask.append(1e-9)
+                self.mask.append(1e-3)
 
         # eeg chunks shape: (n_epochs, C, T)
         # label chunks shape: (n_epochs,)
         # mask shape: (n_epochs,)
 
         # --- train-val split ---
-        self.split_idx = int(self.eeg_chunks.shape[0] * 0.8)  # index at 80% on time dim
+        self.split_idx = int(self.eeg_chunks.shape[0] * 0.5)  # index at 80% on time dim
         self.train_eeg_chunks = self.eeg_chunks[:self.split_idx, :, :]  # selecting 80%
         self.train_label_chunks = self.label_chunks[:self.split_idx]  # selecting 80%
+        self.mask = self.mask[:self.split_idx] # selecting 80%
+
         self.val_eeg_chunks = self.eeg_chunks[self.split_idx:, :, :]  # selecting 20%
         self.val_label_chunks = self.label_chunks[self.split_idx:]  # selecting 20%
 
@@ -90,7 +97,7 @@ class HandDatasetCNN(Dataset):
         return len(self.train_label_chunks)
 
 
-    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Get training data chunk and corresponding label chunk based on index.
 
@@ -103,9 +110,9 @@ class HandDatasetCNN(Dataset):
 
         """
 
-        return self.train_eeg_chunks[index], torch.tensor(self.train_label_chunks[index])
+        return self.train_eeg_chunks[index], torch.tensor(self.train_label_chunks[index]), torch.tensor(self.mask[index])
 
-    def get_validation_data(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
+    def get_validation_data(self, index: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Get validation data chunk and corresponding label chunk based on index.
 
@@ -118,4 +125,4 @@ class HandDatasetCNN(Dataset):
 
         """
 
-        return self.val_eeg_chunks[index], torch.tensor(self.val_label_chunks[index])
+        return self.val_eeg_chunks[index], torch.tensor(self.val_label_chunks[index]), torch.tensor(self.mask[index])

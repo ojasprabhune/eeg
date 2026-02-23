@@ -9,7 +9,7 @@ class EEGCNN(nn.Module):
                  kernel_size_spatial: int = 64,
                  kernel_size_avg_pool: int = 15,
                  ffn_embedding_dim: int = 80,
-                 vocab_size: int = 4) -> None:
+                 vocab_size: int = 3) -> None:
         """
         EEG CNN to perform classification.
         """
