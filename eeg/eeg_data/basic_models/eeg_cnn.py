@@ -40,7 +40,7 @@ class EEGCNN(nn.Module):
         self.fc1 = nn.Linear(flattened_features, ffn_embedding_dim)
         self.fc2 = nn.Linear(ffn_embedding_dim, vocab_size)
 
-        self.softmax = nn.Softmax(dim=1) # softmax across the vocab dimension
+        self.relu = nn.ReLU()
 
 
     def forward(self, x: torch.Tensor):
@@ -63,6 +63,7 @@ class EEGCNN(nn.Module):
         x = torch.flatten(x, start_dim=1) # (B, num_flattened_features)
         
         x = self.fc1(x)
+        x = self.relu(x)
         x = self.fc2(x) # (B, vocab_size)
 
         return x

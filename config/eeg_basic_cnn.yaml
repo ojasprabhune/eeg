@@ -1,7 +1,11 @@
 # eeg_cnn
 
 vocab_size: 3
-ffn_embedding_dim: 10
+ffn_embedding_dim: 20
+num_features: 10
+kernel_size_temporal: 6
+kernel_size_spatial: 64
+kernel_size_avg_pool: 8
 
 # training
 

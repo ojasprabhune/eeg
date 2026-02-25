@@ -4,7 +4,8 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-mne.set_log_level("WARNING") # to suppress info messages
+mne.set_log_level("WARNING")  # to suppress info messages
+
 
 class HandDatasetCNN(Dataset):
     def __init__(
@@ -42,52 +43,63 @@ class HandDatasetCNN(Dataset):
                 )
 
         self.raw: mne.io.Raw = mne.concatenate_raws(self.raws, preload=True)
-        self.filtered = self.raw.copy().filter(l_freq=0.1, h_freq=75) # band-pass filter
-        self.filtered = self.filtered.notch_filter(freqs=60) # notch filtering
-        self.filtered.set_eeg_reference("average", projection=False) # common average reference
-        self.filtered.filter(8, 30, method="iir", iir_params=dict(order=4, ftype="butter")) # butterworth
+        self.filtered = self.raw.copy().filter(
+            l_freq=0.1, h_freq=75)  # band-pass filter
+        self.filtered = self.filtered.notch_filter(freqs=60)  # notch filtering
+        self.filtered.set_eeg_reference(
+            "average", projection=False)  # common average reference
+        self.filtered.filter(8, 30, method="iir", iir_params=dict(
+            order=4, ftype="butter"))  # butterworth
 
-        self.eeg_data = self.filtered.get_data() # (C, T)
+        self.eeg_data = self.filtered.get_data()  # (C, T)
 
         # --- events and labels ---
-        self.events, self.event_ids = mne.events_from_annotations(self.raw) # events is shape (n_events, 3) where each row is (sample, 0, event_id)
+        # events is shape (n_events, 3) where each row is (sample, 0, event_id)
+        self.events, self.event_ids = mne.events_from_annotations(self.raw)
 
-        self.epochs = mne.Epochs(self.raw, events=self.events) # epochs is shape (n_epochs, C, T)
-        self.epochs = self.epochs.get_data() # (n_epochs, C, T)
+        # epochs is shape (n_epochs, C, T)
+        self.epochs = mne.Epochs(self.raw, events=self.events)
+        self.epochs = self.epochs.get_data()  # (n_epochs, C, T)
 
-        self.events = np.delete(self.events, 1, axis=1) # every row: (sample, event_id)
+        # every row: (sample, event_id)
+        self.events = np.delete(self.events, 1, axis=1)
 
         # --- chunking ---
-        self.eeg_chunks = self.epochs # (n_epochs, C, T)
+        self.eeg_chunks = self.epochs  # (n_epochs, C, T)
         self.label_chunks = []
         self.mask = []
 
-        # start at 0 and go up to total number of events 
+        # start at 0 and go up to total number of events
         for i in range(0, self.events.shape[0]):
             if i % 30 == 0:
-                continue # skip those that are too close to the start of the recording since we won't have a full chunk of data for those
+                continue  # skip those that are too close to the start of the recording since we won't have a full chunk of data for those
             else:
-                self.label_chunks.append(self.events[i, 1] - 1) # event_id - 1 to convert from 1, 2, 3 to 0, 1, 2
-        
-        for i in range(0, len(self.label_chunks)):
-            if i % 2 == 0:
+                # event_id - 1 to convert from 1, 2, 3 to 0, 1, 2
+                self.label_chunks.append(self.events[i, 1] - 1)
+
+        for label in self.label_chunks:
+            if label == 0:
+                self.mask.append(1)
+            else:
                 self.mask.append(5)
-            else:
-                self.mask.append(1e-3)
 
         # eeg chunks shape: (n_epochs, C, T)
         # label chunks shape: (n_epochs,)
         # mask shape: (n_epochs,)
 
         # --- train-val split ---
-        self.split_idx = int(self.eeg_chunks.shape[0] * 0.5)  # index at 80% on time dim
-        self.train_eeg_chunks = self.eeg_chunks[:self.split_idx, :, :]  # selecting 80%
-        self.train_label_chunks = self.label_chunks[:self.split_idx]  # selecting 80%
-        self.mask = self.mask[:self.split_idx] # selecting 80%
+        # index at 80% on time dim
+        self.split_idx = int(self.eeg_chunks.shape[0] * 0.5)
+        # selecting 80%
+        self.train_eeg_chunks = self.eeg_chunks[:self.split_idx, :, :]
+        # selecting 80%
+        self.train_label_chunks = self.label_chunks[:self.split_idx]
+        self.mask = self.mask[:self.split_idx]  # selecting 80%
 
-        self.val_eeg_chunks = self.eeg_chunks[self.split_idx:, :, :]  # selecting 20%
-        self.val_label_chunks = self.label_chunks[self.split_idx:]  # selecting 20%
-
+        # selecting 20%
+        self.val_eeg_chunks = self.eeg_chunks[self.split_idx:, :, :]
+        # selecting 20%
+        self.val_label_chunks = self.label_chunks[self.split_idx:]
 
     def __len__(self) -> int:
         """
@@ -95,7 +107,6 @@ class HandDatasetCNN(Dataset):
         """
 
         return len(self.train_label_chunks)
-
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """

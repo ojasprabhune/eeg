@@ -13,6 +13,10 @@ with open("config/eeg_basic_cnn.yaml", "r") as config_file:
 
     vocab_size = config["vocab_size"]
     ffn_embedding_dim = config["ffn_embedding_dim"]
+    num_features = config["num_features"]
+    kernel_size_temporal = config["kernel_size_temporal"]
+    kernel_size_spatial = config["kernel_size_spatial"]
+    kernel_size_avg_pool = config["kernel_size_avg_pool"]
 
     device = config["device"]
     batch_size = config["batch_size"]
@@ -31,10 +35,10 @@ hand_dataset_cnn: HandDatasetCNN = HandDatasetCNN(num_folders=32)
 hand_dataloader = DataLoader(hand_dataset_cnn, batch_size=32, shuffle=True)
 
 model = EEGCNN(seq_len=hand_dataset_cnn.train_eeg_chunks.shape[-1],
-               num_features=10,
-               kernel_size_temporal=30,
-               kernel_size_spatial=64,
-               kernel_size_avg_pool=15,
+               num_features=num_features,
+               kernel_size_temporal=kernel_size_temporal,
+               kernel_size_spatial=kernel_size_spatial,
+               kernel_size_avg_pool=kernel_size_avg_pool,
                ffn_embedding_dim=ffn_embedding_dim,
                vocab_size=vocab_size
                )
@@ -45,6 +49,7 @@ loss_fn = CrossEntropyLoss(reduction="none")
 model.to(device)
 
 val_chunk_counter = 0
+
 
 def train():
     run = wandb.init(
@@ -71,16 +76,18 @@ def train():
             # eeg_chunk: (B, C, T)
             # label_chunk: (B,)
 
-            val_eeg_chunk, val_label_chunk, val_mask_ = hand_dataset_cnn.get_validation_data(val_chunk_counter)
-            val_eeg_chunk = torch.tensor(val_eeg_chunk).to(device).float().unsqueeze(0) # (1, C, T)
-            val_label_chunk = val_label_chunk.to(device).unsqueeze(0) # (1,)
+            val_eeg_chunk, val_label_chunk, val_mask_ = hand_dataset_cnn.get_validation_data(
+                val_chunk_counter)
+            val_eeg_chunk = torch.tensor(val_eeg_chunk).to(
+                device).float().unsqueeze(0)  # (1, C, T)
+            val_label_chunk = val_label_chunk.to(device).unsqueeze(0)  # (1,)
 
             eeg_chunk = eeg_chunk.to(device).float()
             label_chunk = label_chunk.to(device)
             mask = mask.to(device)
 
-            train_hand_pos_logits = model(eeg_chunk) # out: (B, vocab_size)
-            val_hand_pos_logits = model(val_eeg_chunk) # out: (1, vocab_size)
+            train_hand_pos_logits = model(eeg_chunk)  # out: (B, vocab_size)
+            val_hand_pos_logits = model(val_eeg_chunk)  # out: (1, vocab_size)
 
             train_loss = loss_fn(train_hand_pos_logits, label_chunk)
 
@@ -92,7 +99,8 @@ def train():
             train_loss = (train_loss * mask).sum() / (mask.sum() + 1e-8)
 
             iter_tqdm.set_postfix({"loss": train_loss.item()})
-            run.log({"train loss": train_loss.item(), "val loss": val_loss.item()})
+            run.log({"train loss": train_loss.item(),
+                    "val loss": val_loss.item()})
 
             optimizer.zero_grad()  # optimizer has access to all model params, makes grads 0
             train_loss.backward()  # calculates and adds gradients to params so optim sees
