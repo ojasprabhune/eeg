@@ -44,7 +44,7 @@ model = EEGCNN(seq_len=hand_dataset_cnn.train_eeg_chunks.shape[-1],
                vocab_size=vocab_size
                )
 
-optimizer = AdamW(model.parameters(), lr=base_lr, betas=[0.9, 0.98], eps=1e-9)
+optimizer = AdamW(model.parameters(), lr=base_lr, betas=(0.9, 0.98), eps=1e-9)
 loss_fn = CrossEntropyLoss(reduction="none")
 
 model.to(device)

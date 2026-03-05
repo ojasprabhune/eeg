@@ -9,7 +9,7 @@ kernel_size_avg_pool: 4
 
 # training
 
-device: cuda
+device: cpu 
 batch_size: 32
 warmup_steps: 4000
 base_lr: 5e-5
