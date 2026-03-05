@@ -135,7 +135,7 @@ class PositionLLM(nn.Module):
 
         return out.to(x.device)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
         sequence_embedding = self.embedding(x)  # (B, T, C)
         decoder_mask = self.make_mask(sequence_embedding)
         # print(f"emb shape: {sequence_embedding.shape}")
