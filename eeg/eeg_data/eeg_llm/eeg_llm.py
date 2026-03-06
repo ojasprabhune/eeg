@@ -22,5 +22,29 @@ class EEGLLM(nn.Module):
     ) -> None:
         super().__init__()
 
+        self.encoder = Encoder(
+            vocab_size=vocab_size,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            embedding_dim=embedding_dim,
+            ffn_hidden_dim=ffn_hidden_dim,
+            qk_length=qk_length,
+            value_length=value_length,
+            max_length=max_length,
+            dropout=dropout
+        )
+
+        self.decoder = Decoder(
+            vocab_size=vocab_size,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            embedding_dim=embedding_dim,
+            ffn_hidden_dim=ffn_hidden_dim,
+            qk_length=qk_length,
+            value_length=value_length,
+            max_length=max_length,
+            dropout=dropout
+        )
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return x

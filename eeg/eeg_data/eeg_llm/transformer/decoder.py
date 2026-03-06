@@ -27,14 +27,10 @@ class DecoderLayer(nn.Module):
         of the same shape.
 
         The decoder layer will have three main components:
-            1. A Masked Multi-Head Attention layer (you'll need to
-               modify the MultiHeadAttention layer to handle this!)
+            1. A Masked Multi-Head Attention layer
             2. A Multi-Head Attention layer for cross-attention
                between the target and source embeddings.
             3. A Feed-Forward Neural Network layer.
-
-        Remember that for each Multi-Head Attention layer, we
-        need create Q, K, and V matrices from the input embedding(s)!
         """
         super().__init__()
 
@@ -105,10 +101,7 @@ class Decoder(nn.Module):
         dropout: float = 0.1,
     ):
         """
-        Remember that the decoder will take in a sequence
-        of tokens AND a source embedding
-        and will output an encoded representation
-        of shape (B, T, C).
+        The decoder will take in a sequence of tokens AND a source embedding and will output an encoded representation of shape (B, T, C).
 
         First, we need to create an embedding from the sequence
         of tokens. For this, we need the vocab size.

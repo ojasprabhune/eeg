@@ -53,7 +53,7 @@ class EEGDataset(Dataset):
         )  # (T,)
 
         # precompute VQVAE tokens
-        self.vqvae_tokens_all = None
+        self.vqvae_tokens_all = []
         if self.use_vqvae:
             print("Pre-computing VQ-VAE tokens...")
             self.vqvae_tokens_all = []
@@ -127,20 +127,9 @@ class EEGDataset(Dataset):
     def __len__(self) -> int:
         return len(self.regions)
 
-    def __getitem__(self, index: int) -> int:
+    def __getitem__(self, index: int) -> tuple | dict[str, list[int]]:
         """
         Called when we do dataset[idx]
-
-        __ means a "dunder" function for double underscore function.
-        These are typically special functions that are called with
-        special syntax. For example, __init__ is called when we
-        initialize an object:
-            E.g. a = RegionDataset(data_file="data/data.npy")
-            calls __init__ with the parameter
-        When we want to index into our object, we do:
-            b = dataset[0]
-        which converts to:
-            b = dataset.__getitem__(0)
         """
 
         # returning (1, T) of vqvae tokens to input into PositionLLM

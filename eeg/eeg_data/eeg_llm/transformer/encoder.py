@@ -40,7 +40,7 @@ class PositionalEncoding(nn.Module):
             x: Tensor, shape (B, T, C)
         """
         x = x.transpose(0, 1)
-        x = x + self.pe[: x.size(0)]
+        x = x + self.pe[: x.size(0)] # type: ignore
         x = self.dropout(x)
         return x.transpose(0, 1)
 
@@ -125,22 +125,13 @@ class Encoder(nn.Module):
         dropout: float,
     ):
         """
-        Remember that the encoder will take in a sequence
-        of tokens and will output an encoded representation
-        of shape (B, T, C).
-
-        First, we need to create an embedding from the sequence
-        of tokens. For this, we need the vocab size.
-
-        Next, we want to create a series of Encoder layers,
-        each of which will have a Multi-Head Attention layer
-        and a Feed-Forward Neural Network layer. For this, we
-        need to specify the number of layers and the number of
-        heads.
-
-        Additionally, for every Multi-Head Attention layer, we
-        need to know how long each query/key is, and how long
-        each value is.
+        The encoder will take in a sequence of tokens of shape (B, T) and will
+        output an encoded representation of shape (B, T, C). The forward pass of
+        the encoder consists of:
+        1. Turning the input into a sequence embedding
+        2. Positionally encoding that
+        3. Drop out
+        4. Then passing this through the encoder several times, outputting a hidden representation
         """
         super().__init__()
 

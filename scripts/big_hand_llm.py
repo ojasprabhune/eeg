@@ -42,7 +42,7 @@ appendage_dataset: AppendageDataset = AppendageDataset(
 appendage_dataloader = DataLoader(appendage_dataset,
                                   batch_size=32,
                                   shuffle=True,
-                                  collate_fn=AppendageDataset.collate_fn)
+                                  collate_fn=AppendageDataset.collate_fn) # type: ignore
 
 print(
     f"Raw positions shape: {appendage_dataset.train_data.shape}, expected: (2, T, 63)"
@@ -75,7 +75,7 @@ model = PositionLLM(
     duration_prediction=duration_prediction,
 )
 
-optimizer = AdamW(model.parameters(), lr=base_lr, betas=[0.9, 0.98], eps=1e-9)
+optimizer = AdamW(model.parameters(), lr=base_lr, betas=(0.9, 0.98), eps=1e-9)
 scheduler = LambdaLR(optimizer, lr_lambda=lr_lambda)
 
 class_loss_fn = CrossEntropyLoss(reduction="none")

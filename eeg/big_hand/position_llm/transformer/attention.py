@@ -116,7 +116,7 @@ class MultiHeadAttention(nn.Module):
 
         # transpose of K
         lookup = torch.matmul(Q, Kt)  # check similarity between queries and keys
-        scaled_lookup = lookup / math.sqrt(self.qk_length)  # compensate for varience
+        scaled_lookup = lookup / math.sqrt(self.qk_length)  # compensate for variance
 
         if mask is not None:
             # want to change values of scaled_lookup where mask is 0
