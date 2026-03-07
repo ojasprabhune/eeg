@@ -1,5 +1,4 @@
 import math
-from typing import Optional
 
 import torch
 import torch.nn as nn
@@ -125,7 +124,7 @@ class Encoder(nn.Module):
         dropout: float,
     ):
         """
-        The encoder will take in a sequence of tokens of shape (B, T) and will
+        The EEG encoder will take in EEG data of shape (B, T, C) and will
         output an encoded representation of shape (B, T, C). The forward pass of
         the encoder consists of:
         1. Turning the input into a sequence embedding
@@ -153,7 +152,6 @@ class Encoder(nn.Module):
         # and then use the other layers we've implemented to
         # build out the Transformer encoder.
 
-        self.embedding = nn.Embedding(vocab_size, embedding_dim)
         self.encoder_layers = nn.ModuleList(
             [
                 EncoderLayer(
@@ -177,8 +175,7 @@ class Encoder(nn.Module):
         The forward pass of the Encoder.
         """
 
-        sequence_embedding = self.embedding(x)  # (B, T, C)
-        x = self.positional_encoding(sequence_embedding)
+        x = self.positional_encoding(x)
         x = self.dropout(x)
         for encoder_layer in self.encoder_layers:
             x = encoder_layer(x)

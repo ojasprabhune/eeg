@@ -20,6 +20,7 @@ class EEGLLM(nn.Module):
         max_length: int = 2048,
         dropout: float = 0.1,
     ) -> None:
+
         super().__init__()
 
         self.encoder = Encoder(
@@ -46,5 +47,14 @@ class EEGLLM(nn.Module):
             dropout=dropout
         )
 
+        self.dropout = nn.Dropout(p=dropout)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        print("input shape", x.shape)
+        quit()
+        
+        x_enc = self.encoder(x)
+
+        x_dec = self.decoder(x, x_enc)
+
         return x
