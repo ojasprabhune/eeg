@@ -7,7 +7,7 @@ import torch
 import torchaudio
 from torch.utils.data import Dataset
 
-from .utils import appendages
+from .utils import appendages, Colors
 from eeg.data_collection import JointData
 from eeg.big_hand.position_llm import RegionTokenizer
 from eeg.big_hand.position_llm.vqvae import VQVAE
@@ -28,12 +28,13 @@ class EEGDataset(Dataset):
         preprocesses the data.
         """
 
-        print("Initializing dataset...")
+        print(f"{Colors.HEADER}{Colors.BOLD}Initializing dataset...{Colors.ENDC}")
 
         super().__init__() 
 
         self.region_tokenizer = RegionTokenizer(region_tokenizer_path)
 
+        print(f"{Colors.OKBLUE}Getting VQVAE model...{Colors.ENDC}")
         # --- vqvae ---
         self.vqvae = VQVAE(input_dim=12, codebook_size=512, embedding_dim=1024)
         vqvae_state_dict = torch.load(vqvae_path, map_location=device)
@@ -44,37 +45,53 @@ class EEGDataset(Dataset):
 
         # --- EEG ---
 
-        print("Getting EEG data...")
+        print(f"{Colors.OKBLUE}Getting EEG data...{Colors.ENDC}")
         self.raws = []
         for path in Path(f"{eeg_data_path}").rglob("*.edf"):
             self.raws.append(mne.io.read_raw_edf(path))
 
+        # - filtering -
         self.raw: mne.io.Raw = mne.concatenate_raws(self.raws, preload=True)
         self.filtered = self.raw.copy().filter(l_freq=0.1, h_freq=50)  # band-pass filter
         self.filtered = self.filtered.notch_filter(freqs=60)  # notch filtering
         self.filtered.set_eeg_reference("average", projection=False)  # common average reference
         self.filtered.filter(8, 30, method="iir", iir_params=dict(order=4, ftype="butter"))  # butterworth
 
+        # - processing -
+        self.eeg_channels = [
+            "AF3","F7","F3","FC5","T7","P7","O1",
+            "O2","P8","T8","FC6","F4","F8","AF4"
+        ]
+        self.filtered.pick(self.eeg_channels)
+
+        # TODO use accel + mag data & remove low EEG quality segments
+
         self.eeg_data: np.ndarray = self.filtered.get_data()  # (C, T)
         
-        print("Processed EEG data. Shape:", self.eeg_data.shape)
+        print(f"{Colors.OKGREEN}Filtered & processed EEG data.")
+        print(f"EEG shape: {self.eeg_data.shape}{Colors.ENDC}")
 
-    #     # --- appendages + regions ---
+        # --- appendages + regions ---
 
-    #     # temporary import for train data
-    #     self.train_data = np.load(f"{data_path}/test_eeg.npy")
-    #     self.val_data = np.load(f"{data_path}/validation_dataset.npy")
+        print(f"{Colors.OKBLUE}Getting appendage data...{Colors.ENDC}")
+        self.hands = []
+        for path in Path(f"{hand_data_path}").rglob("*.npy"):
+            self.hands.append(np.load(path))
 
-    #     train_data_joints = JointData(self.train_data)
+        self.raw_app_data = np.concatenate(self.hands, axis=1) # along time dim
+        print("raw shape:", raw_app_data.shape)
 
-    #     self.app_data = appendages(train_data_joints)  # (T, 12)
-    #     self.app_data = self.region_tokenizer.scaler.transform(self.app_data)
+        data_joints = JointData(self.raw_app_data)
+        print("joints shape:", raw_app_data.shape)
 
-    #     self.region_tokens = self.region_tokenizer.encode(
-    #         torch.tensor(self.app_data)
-    #     )  # (T,)
+        self.app_data = appendages(train_data_joints)  # (T, 12)
+        print("app shape:", raw_app_data.shape)
+        self.app_data = self.region_tokenizer.scaler.transform(self.app_data)
 
-    #     print("Done getting appendage data.")
+        self.region_tokens = self.region_tokenizer.encode(torch.tensor(self.app_data))  # (T,)
+        print("regions shape:", raw_app_data.shape)
+
+        print(f"{Colors.OKGREEN}Retrieved appendage data.{Colors.ENDC}")
 
     #     # precompute VQVAE tokens
     #     self.vqvae_tokens_all = []

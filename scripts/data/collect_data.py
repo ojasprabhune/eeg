@@ -16,6 +16,18 @@ parser.add_argument(
     "data_time", type=int, help="Length of hand pose estimation data in seconds"
 )
 parser.add_argument(
+    "--webcam",
+    type=bool,
+    default=True,
+    help="Either run on webcam video or video file"
+)
+parser.add_argument(
+    "--input_video",
+    type=str,
+    default="",
+    help="Video file to run estimation on (if selected)"
+)
+parser.add_argument(
     "--save_video",
     type=bool,
     default=False,
@@ -38,13 +50,17 @@ joint_data_world = []  # initialize list of frames with world landmarks
 joint_data_norm = []  # initialize list of frames with norm landmarks
 filename = args.filename
 num_frames = args.data_time * 30
+input_video_path = args.input_video
 
 
 def hand_detection(mp_hands, mp_drawing, joint_data_world: list, joint_data_norm: list, set_fps: int):
     cur_frame = 1
 
     # getting camera / webcam (0, 1, 2 for connected webcams)
-    cap = cv2.VideoCapture(0)
+    if args.webcam:
+        cap = cv2.VideoCapture(0)
+    else:
+        cap = cv2.VideoCapture(input_video_path)
 
     # set desired FPS to camera
     cap.set(cv2.CAP_PROP_FPS, set_fps)
