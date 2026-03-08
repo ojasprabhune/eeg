@@ -151,7 +151,7 @@ def hand_detection(mp_hands, mp_drawing, joint_data_world: list, joint_data_norm
             if cv2.waitKey(10) & 0xFF == ord("q"):
                 break
 
-            if cur_frame > num_frames:
+            if args.webcam and cur_frame > num_frames:
                 break
 
     # release webcam
