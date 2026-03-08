@@ -162,13 +162,13 @@ def hand_detection(mp_hands, mp_drawing, joint_data_world: list, joint_data_norm
 
 def write(data: list, filename: str):
     dataset = np.array(data)  # turn lists into numpy array
-    np.save(f"data/{filename}.npy", dataset)  # save numpy array
+    np.save(f"{filename}.npy", dataset)  # save numpy array
 
 
 hand_detection(mp_hands, mp_drawing, joint_data_world, joint_data_norm, 30)
 write([joint_data_world, joint_data_norm], filename)
 
-data = JointData(f"data/{filename}.npy")
+data = JointData(f"{filename}.npy")
 if args.plot:
     if args.joint is not None:
         data.plot_data(args.joint)
