@@ -3,6 +3,7 @@ import os
 
 from eeg.data_collection import JointData, Joint, DataType
 
+
 class Colors:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
@@ -13,6 +14,7 @@ class Colors:
     ENDC = '\033[0m'
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
+
 
 def appendages(joint_data: JointData) -> np.ndarray:
     """

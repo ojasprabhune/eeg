@@ -2,6 +2,7 @@
 **/__pycache__
 **/eeg.egg-info
 .venv/
+./.venv/
 win_venv/
 .git/
 **wandb/

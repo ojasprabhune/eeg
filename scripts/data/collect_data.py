@@ -18,9 +18,10 @@ parser.add_argument(
 parser.add_argument(
     "--webcam",
     type=bool,
-    default=True,
+    default=False,
     help="Either run on webcam video or video file"
 )
+parser.add_argument("--no_imshow", action="store_true", help="Do not show OpenCV window")
 parser.add_argument(
     "--input_video",
     type=str,
@@ -57,7 +58,7 @@ def hand_detection(mp_hands, mp_drawing, joint_data_world: list, joint_data_norm
     cur_frame = 1
 
     # getting camera / webcam (0, 1, 2 for connected webcams)
-    if args.webcam:
+    if args.webcam or not input_video_path:
         cap = cv2.VideoCapture(0)
     else:
         cap = cv2.VideoCapture(input_video_path)
@@ -87,6 +88,9 @@ def hand_detection(mp_hands, mp_drawing, joint_data_world: list, joint_data_norm
     ) as hands:
         # reading frames while the capture is opened
         while cap.isOpened():
+            cur_frame += 1
+            if cur_frame % 1000 == 0:
+                print(f"{cur_frame} frames complete...")
             # read each frame from webcam
             # ret and frame variables unpacking cap.read() function
             # a return value and image from webcame
@@ -96,9 +100,13 @@ def hand_detection(mp_hands, mp_drawing, joint_data_world: list, joint_data_norm
             frame_data_norm = []
 
             if not success:
-                print("Ignoring empty camera frame.")
                 # if loading a video, use 'break' instead of 'continue'.
-                continue
+                if args.webcam:
+                    print("Ignoring empty camera frame.")
+                    continue
+                else:
+                    print("Finished processing video... Closing")
+                    break
 
             # to improve performance, optionally mark the image as not writeable to
             # pass by reference.
@@ -139,17 +147,17 @@ def hand_detection(mp_hands, mp_drawing, joint_data_world: list, joint_data_norm
                 # add time step to data
                 joint_data_world.append(frame_data_world)
                 joint_data_norm.append(frame_data_norm)
-                cur_frame += 1
 
             # render image to screen using OpenCV with "Hand tracking" window title
-            cv2.imshow("Hand tracking", frame)
+            if not args.no_imshow:
+                cv2.imshow("Hand tracking", frame)
+                
+                # hit "q" and close window
+                if cv2.waitKey(10) & 0xFF == ord("q"):
+                    break
 
             if args.save_video:
                 writer.write(frame)
-
-            # hit "q" and close window
-            if cv2.waitKey(10) & 0xFF == ord("q"):
-                break
 
             if args.webcam and cur_frame > num_frames:
                 break

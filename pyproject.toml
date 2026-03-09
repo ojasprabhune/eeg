@@ -12,7 +12,7 @@ dependencies = [
     "future>=1.0.0",
     "ipykernel>=6.30.1",
     "matplotlib>=3.10.5",
-    "mediapipe>=0.10.14",
+    "mediapipe==0.10.14",
     "mink>=0.0.13",
     "mne>=1.11.0",
     "mujoco>=3.3.7",
