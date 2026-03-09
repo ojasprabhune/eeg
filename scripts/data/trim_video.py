@@ -22,6 +22,7 @@ fps = 29.973234
 
 if eeg_data_path.endswith(".edf") or hand_data_path.endswith(".npy"):
     print(f"{Colors.FAIL}Error: Paths should not include file extensions.{Colors.ENDC}")
+    quit()
 
 def trim_recording(
     eeg_data_path: str,
