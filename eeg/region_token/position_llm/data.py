@@ -1,3 +1,8 @@
+"""
+Unfinished: decided to skip and only take first 64 time steps for now. Big hand
+dataset is the main dataset.
+"""
+
 import numpy as np
 
 import torch

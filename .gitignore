@@ -1,5 +1,14 @@
+**/.DS_Store
 **/__pycache__
 **/eeg.egg-info
 .venv/
+./.venv/
 win_venv/
 .git/
+**wandb/
+.env
+**target/
+out/
+*.egg-info/
+data/dataset/
+**wandb/*

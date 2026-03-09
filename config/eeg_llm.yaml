@@ -1,0 +1,29 @@
+# eeg_llm
+
+vocab_size: 4
+num_layers: 4
+num_heads: 4
+embedding_dim: 64
+ffn_hidden_dim: 64
+qk_length: 64
+value_length: 64
+max_length: 2048
+
+num_channels: 64
+num_times: 800
+num_outputs: 0
+
+dropout: 0.1
+
+# training
+
+device: cpu 
+batch_size: 32
+warmup_steps: 4000
+base_lr: 5e-5
+epochs: 50
+
+run_name: eeg_llm
+# use_ckpt_path: /var/log/thavamount/eeg_ckpts/eeg_lm/eeg_llm.pth
+use_ckpt_path: None
+save_ckpt_path: /var/log/thavamount/eeg_ckpts/eeg_lm/big/eeg_llm

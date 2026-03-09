@@ -7,10 +7,15 @@ import matplotlib.pyplot as plt
 from eeg.position_llm.data import DeltaData
 
 training_data = DeltaData("/home/prabhune/projects/research/2026/eeg/data/test.npy")
+<<<<<<< HEAD
 # test_data = DeltaData("test")
 
 train_dataloader = DataLoader(training_data, batch_size=501, shuffle=False)
 # test_dataloader = DataLoader(test_data, batch_size=64, shuffle=True)
+=======
+
+train_dataloader = DataLoader(training_data, batch_size=501, shuffle=False)
+>>>>>>> eeg_data
 
 train_features = next(iter(train_dataloader))
 print(f"Feature batch shape: {train_features.size()}")
