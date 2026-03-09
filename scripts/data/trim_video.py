@@ -70,8 +70,8 @@ def trim_recording(
     print("start seconds hand:", start_frame / fps, "\n")
 
 trim_recording(
-    args.eeg_data_path,
-    args.hand_data_path,
+    eeg_data_path,
+    hand_data_path,
     eeg_trim_start_seconds=args.eeg_trim_start_seconds,
     hand_trim_start_seconds=args.hand_trim_start_seconds,
     start_offset_seconds=args.start_offset_seconds
