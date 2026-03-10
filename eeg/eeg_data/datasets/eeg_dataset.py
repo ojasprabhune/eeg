@@ -1,6 +1,7 @@
 from pathlib import Path
 from tqdm import tqdm
 import numpy as np
+import time
 import mne
 
 import torch
@@ -21,7 +22,8 @@ class EEGDataset(Dataset):
         region_tokenizer_path: str = "models/appendages",
         seq_len: int = 900,
         use_vqvae: bool = True,
-        device: str = "cpu"
+        device: str = "cpu",
+        print_shapes: bool = False,
     ) -> None:
         """
         Dataset for regressing EEG data to hand movements. Loads and
@@ -32,10 +34,9 @@ class EEGDataset(Dataset):
 
         super().__init__() 
 
-        self.region_tokenizer = RegionTokenizer(region_tokenizer_path)
+        # --- vqvae ---
 
         print(f"{Colors.OKBLUE}Getting VQVAE model...{Colors.ENDC}")
-        # --- vqvae ---
         self.vqvae = VQVAE(input_dim=12, codebook_size=512, embedding_dim=1024)
         vqvae_state_dict = torch.load(vqvae_path, map_location=device)
         self.vqvae.load_state_dict(vqvae_state_dict["model"])
@@ -43,12 +44,14 @@ class EEGDataset(Dataset):
         self.vqvae.eval()
         self.use_vqvae = use_vqvae
 
+        self.region_tokenizer = RegionTokenizer(region_tokenizer_path)
+
         # --- EEG ---
 
         print(f"{Colors.OKBLUE}Getting EEG data...{Colors.ENDC}")
         self.raws = []
-        for path in Path(f"{eeg_data_path}").rglob("*.edf"):
-            self.raws.append(mne.io.read_raw_edf(path))
+        for path in Path(f"{eeg_data_path}").rglob("*_cut_raw.fif"):
+            self.raws.append(mne.io.read_raw_fif(path))
 
         # - filtering -
         self.raw: mne.io.Raw = mne.concatenate_raws(self.raws, preload=True)
@@ -65,108 +68,66 @@ class EEGDataset(Dataset):
         self.filtered.pick(self.eeg_channels)
 
         # TODO use accel + mag data & remove low EEG quality segments
+        # TODO fix sampling frequencies for EEG and hand if required
 
         self.eeg_data: np.ndarray = self.filtered.get_data()  # (C, T)
         
         print(f"{Colors.OKGREEN}Filtered & processed EEG data.")
-        print(f"EEG shape: {self.eeg_data.shape}{Colors.ENDC}")
 
         # --- appendages + regions ---
 
         print(f"{Colors.OKBLUE}Getting appendage data...{Colors.ENDC}")
         self.hands = []
-        for path in Path(f"{hand_data_path}").rglob("*.npy"):
+        for path in Path(f"{hand_data_path}").rglob("*_cut.npy"):
             self.hands.append(np.load(path))
 
         self.raw_app_data = np.concatenate(self.hands, axis=1) # along time dim
-        print("raw shape:", raw_app_data.shape)
-
-        data_joints = JointData(self.raw_app_data)
-        print("joints shape:", raw_app_data.shape)
-
-        self.app_data = appendages(train_data_joints)  # (T, 12)
-        print("app shape:", raw_app_data.shape)
+        self.data_joints = JointData(self.raw_app_data)
+        self.app_data = appendages(self.data_joints)  # (T, 12)
         self.app_data = self.region_tokenizer.scaler.transform(self.app_data)
-
         self.region_tokens = self.region_tokenizer.encode(torch.tensor(self.app_data))  # (T,)
-        print("regions shape:", raw_app_data.shape)
 
         print(f"{Colors.OKGREEN}Retrieved appendage data.{Colors.ENDC}")
 
-    #     # precompute VQVAE tokens
-    #     self.vqvae_tokens_all = []
-    #     if self.use_vqvae:
-    #         print("Pre-computing VQ-VAE tokens...")
-    #         self.vqvae_tokens_all = []
-    #         chunk_size = 2048  # process in chunks
-    #         with torch.no_grad():
-    #             for i in tqdm(range(0, len(self.app_data), chunk_size)):
-    #                 chunk = self.app_data[i: i + chunk_size]
-    #                 chunk_tensor = (
-    #                     torch.tensor(chunk, dtype=torch.float32)
-    #                     .to("cuda")
-    #                     .unsqueeze(0)
-    #                 )
-    #                 tokens = self.vqvae(chunk_tensor, return_toks=True)
-    #                 self.vqvae_tokens_all.append(
-    #                     tokens.cpu().numpy().flatten())
-    #         self.vqvae_tokens_all = np.concatenate(self.vqvae_tokens_all)
+        if print_shapes:
+            print("EEG shape:       ", self.eeg_data.shape) # (14, T)
+            print("raw app shape:   ", self.raw_app_data.shape) # (2, T, 63)
+            print("app shape:       ", self.app_data.shape) # (T, 12)
+            print("regions shape:   ", self.region_tokens.shape) # (T,)
 
-    #     # --- eeg ---
-    #     self.desired_channels = ['AF3', 'F7', 'F3', 'FC5', 'T7',
-    #                              'P7', 'O1', 'O2', 'P8', 'T8', 'FC6', 'F4', 'F8', 'AF4']
+        print(f"{Colors.OKGREEN}Successful retrieved all data.{Colors.ENDC}")
 
-    #     self.raw_eeg = mne.io.read_raw_edf(f"{data_path}/eeg_test.edf")
-    #     self.picks = mne.pick_channels(
-    #         self.raw_eeg.ch_names, self.desired_channels)  # need to only have data channels
-    #     self.raw_eeg = self.raw_eeg.copy().pick(self.picks)
-    #     self.eeg_data, times = self.raw_eeg[:, :]
-    #     self.eeg_data = torch.tensor(self.eeg_data, dtype=torch.float32)
+        # - vq-vae pre-computing -
+        self.vqvae_tokens_all = []
+        if self.use_vqvae:
+            print(f"{Colors.OKBLUE}Pre-computing VQ-VAE tokens...{Colors.ENDC}")
+            self.vqvae_tokens_all = []
+            chunk_size = 2048  # process in chunks
+            with torch.no_grad():
+                for i in tqdm(range(0, len(self.app_data), chunk_size)):
+                    chunk = self.app_data[i: i + chunk_size, :]
+                    chunk_tensor = (
+                        torch.tensor(chunk, dtype=torch.float32)
+                        .to(device)
+                        .unsqueeze(0)
+                    )
+                    tokens = self.vqvae.encode(chunk_tensor)
+                    self.vqvae_tokens_all.append(tokens.cpu().numpy().flatten())
+            self.vqvae_tokens_all = np.concatenate(self.vqvae_tokens_all)
 
-    #     # sampling frequency
-    #     original_sample_rate_hz = self.raw_eeg.info["sfreq"]
-    #     target_sample_rate_hz = 30
+            if print_shapes:
+                print("VQ-VAE tokens shape:", self.vqvae_tokens_all.shape) # (T,)
 
-    #     # instantiate the Resample transform
-    #     resampler = torchaudio.transforms.Resample(
-    #         orig_freq=original_sample_rate_hz,
-    #         new_freq=target_sample_rate_hz
-    #     )
+        # --- sequences ---
+        # self...
+        # self...
+        # self...
+        # self...
 
-    #     # apply the transform to your waveform
-    #     downsampled_data: torch.Tensor = resampler(self.eeg_data)
+        # TODO sequencing
 
-    #     # FIXME fix if wrong or doing something weirdly
-    #     self.eeg_data = downsampled_data.T
-    #     start = self.eeg_data.shape[0] - self.train_data.shape[-2]
-    #     self.eeg_data = self.eeg_data[start:, :]
-
-    #     # --- sequences ---
-    #     # regions will be a list of region sequences, each with shape (64,)
-    #     self.regions = []
-    #     self.appendages = []
-    #     self.vqvae_token_crops = []
-    #     self.eegs = []  # FIXME lol eegs
-
-    #     # start at 0, go up to len(self.regions), and step by seq_len (30 seconds of data)
-    #     for i in range(0, len(self.region_tokens), seq_len):
-    #         region = self.region_tokens[i: i + seq_len]  # shape: (seq_len,)
-    #         appendage = self.app_data[i: i + seq_len]  # shape: (seq_len, 12)
-    #         # shape: (seq_len, num_eeg_channels)
-    #         eeg = self.eeg_data[i: i + seq_len, :]
-
-    #         # all regions are length seq_len
-    #         if len(region) == seq_len and len(appendage) == seq_len:  # redundant
-    #             self.regions.append(region)
-    #             self.appendages.append(appendage)
-    #             self.eegs.append(eeg)
-    #             if self.use_vqvae:
-    #                 self.vqvae_token_crops.append(
-    #                     self.vqvae_tokens_all[i: i + seq_len]
-    #                 )
-
-    # def __len__(self) -> int:
-    #     return len(self.regions)
+    def __len__(self) -> int:
+        return len(self.regions)
 
     # def __getitem__(self, index: int) -> tuple | dict[str, list[int]]:
     #     """

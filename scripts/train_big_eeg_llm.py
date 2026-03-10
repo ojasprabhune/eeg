@@ -43,7 +43,7 @@ with open("config/eeg_basic_llm.yaml", "r") as config_file:
     save_ckpt_path = config["save_ckpt_path"]
 
 
-hand_dataset: EEGDataset = EEGDataset()
+hand_dataset: EEGDataset = EEGDataset(print_shapes=True)
 # hand_dataloader = DataLoader(hand_dataset, batch_size=32, shuffle=True)
 
 model = EEGLLM(
