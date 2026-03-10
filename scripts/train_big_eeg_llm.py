@@ -43,8 +43,8 @@ with open("config/eeg_basic_llm.yaml", "r") as config_file:
     save_ckpt_path = config["save_ckpt_path"]
 
 
-hand_dataset: EEGDataset = EEGDataset(print_shapes=True)
-# hand_dataloader = DataLoader(hand_dataset, batch_size=32, shuffle=True)
+hand_dataset: EEGDataset = EEGDataset()
+hand_dataloader = DataLoader(hand_dataset, batch_size=32, shuffle=True)
 
 model = EEGLLM(
     vocab_size=vocab_size,
@@ -56,12 +56,12 @@ model = EEGLLM(
     value_length=value_length,
     max_length=max_length,
     dropout=dropout
-    )
+)
 
 optimizer = AdamW(model.parameters(), lr=base_lr, betas=(0.9, 0.98), eps=1e-9)
 loss_fn = CrossEntropyLoss(reduction="none")
 
-# model.to(device)
+model.to(device)
 
 # def train():
 #     run = wandb.init(

@@ -21,7 +21,6 @@ class EEGDataset(Dataset):
         vqvae_path: str = "/var/log/thavamount/eeg_ckpts/eeg_vqvae/vqvae_final_1250.pth",
         region_tokenizer_path: str = "models/appendages",
         seq_len: int = 900,
-        use_vqvae: bool = True,
         device: str = "cpu",
         print_shapes: bool = False,
     ) -> None:
@@ -31,6 +30,8 @@ class EEGDataset(Dataset):
         """
 
         print(f"{Colors.HEADER}{Colors.BOLD}Initializing dataset...{Colors.ENDC}")
+        self.print_shapes = print_shapes
+        self.device = device
 
         super().__init__() 
 
@@ -42,7 +43,6 @@ class EEGDataset(Dataset):
         self.vqvae.load_state_dict(vqvae_state_dict["model"])
         self.vqvae.to(device)
         self.vqvae.eval()
-        self.use_vqvae = use_vqvae
 
         self.region_tokenizer = RegionTokenizer(region_tokenizer_path)
 
@@ -72,7 +72,7 @@ class EEGDataset(Dataset):
         # TODO fix sampling frequencies for EEG and hand if required
 
         # (C, T)
-        self.eeg_data: np.ndarray = self.filtered.get_data() # type: ignore
+        self.eeg_data: np.ndarray = self.filtered.get_data().T # type: ignore
         
         print(f"{Colors.OKGREEN}Filtered & processed EEG data.")
 
@@ -93,87 +93,62 @@ class EEGDataset(Dataset):
 
         # - vq-vae pre-computing -
         self.vqvae_tokens_all = []
-        if self.use_vqvae:
-            print(f"{Colors.OKBLUE}Pre-computing VQ-VAE tokens...{Colors.ENDC}")
-            self.vqvae_tokens_all = []
-            chunk_size = 2048  # process in chunks
-            with torch.no_grad():
-                for i in tqdm(range(0, len(self.app_data), chunk_size)):
-                    chunk = self.app_data[i: i + chunk_size, :]
-                    chunk_tensor = (
-                        torch.tensor(chunk, dtype=torch.float32)
-                        .to(device)
-                        .unsqueeze(0)
-                    )
-                    tokens = self.vqvae.encode(chunk_tensor)
-                    self.vqvae_tokens_all.append(tokens.cpu().numpy().flatten())
-            self.vqvae_tokens_all = np.concatenate(self.vqvae_tokens_all)
+        print(f"{Colors.OKBLUE}Pre-computing VQ-VAE tokens...{Colors.ENDC}")
+        self.vqvae_tokens_all = []
+        chunk_size = 2048  # process in chunks
+        with torch.no_grad():
+            for i in tqdm(range(0, len(self.app_data), chunk_size)):
+                chunk = self.app_data[i: i + chunk_size, :]
+                chunk_tensor = (
+                    torch.tensor(chunk, dtype=torch.float32)
+                    .to(device)
+                    .unsqueeze(0)
+                )
+                tokens = self.vqvae.encode(chunk_tensor)
+                self.vqvae_tokens_all.append(tokens.cpu().numpy().flatten())
+        self.vqvae_tokens_all = np.concatenate(self.vqvae_tokens_all)
 
-            if print_shapes:
-                print("EEG shape:          ", self.eeg_data.shape) # (14, T)
-                print("app shape:          ", self.app_data.shape) # (T, 12)
-                print("VQ-VAE tokens shape:", self.vqvae_tokens_all.shape) # (T,)
+        if print_shapes:
+            print("EEG shape:          ", self.eeg_data.shape) # (14, T)
+            print("app shape:          ", self.app_data.shape) # (T, 12)
+            print("VQ-VAE tokens shape:", self.vqvae_tokens_all.shape) # (T,)
 
         # --- sequences ---
         self.eeg_chunks = []
         self.app_chunks = []
         self.token_chunks = []
 
-        # TODO sequencing
+        # all chunks are length seq_len
+        for i in range(0, len(self.eeg_data), seq_len):
+            eeg_chunk = self.eeg_data[i : i + seq_len, :]  # shape: (seq_len, 14)
+            app_chunk = self.app_data[i : i + seq_len, :]  # shape: (seq_len, 12)
+            token_chunk = self.vqvae_tokens_all[i : i + seq_len]  # shape: (seq_len,)
+
+            if eeg_chunk.shape[0] == seq_len:
+                self.eeg_chunks.append(eeg_chunk)
+                self.app_chunks.append(app_chunk)
+                self.token_chunks.append(token_chunk)
+        
+        if print_shapes:
+            print(f"{Colors.WARNING}total # of chunks: {self.__len__()}{Colors.ENDC}")
 
     def __len__(self) -> int:
         return len(self.eeg_chunks)
 
-    # def __getitem__(self, index: int) -> tuple | dict[str, list[int]]:
-    #     """
-    #     Called when we do dataset[idx]
-    #     """
+    def __getitem__(
+        self,
+        index: int
+    ) -> tuple[list[list[int]], list[list[int]], list[int]]:
+        """
+        Returns the EEG data, appendage data, and VQ-VAE tokens for the given
+        index.
+        """
 
-    #     # returning (1, T) of vqvae tokens to input into PositionLLM
-    #     # returning (T, 12) of appendage values
-    #     # TODO add eegs to this if applicable
-    #     if self.use_vqvae:
-    #         vqvae_tokens = self.vqvae_token_crops[index]
+        eeg: list[list[int]] = self.eeg_chunks[index]
+        apps: list[list[int]] = self.app_chunks[index]
+        tokens: list[int] = self.token_chunks[index]
 
-    #         if not self.duration_prediction:
-    #             return vqvae_tokens, self.appendages[index], self.eegs[index]
-    #         else:
-    #             # vqvae_tokens, appendage_values, durations, mask
-    #             # vqvae_tokens: (T,)
-    #             reversed_vqvae_toks = vqvae_tokens[::-1]
-    #             durations = [1]
-    #             for i in range(1, len(reversed_vqvae_toks)):
-    #                 # counting backwards
-    #                 current_tok = reversed_vqvae_toks[i]
-    #                 prev_tok = reversed_vqvae_toks[i - 1]
-
-    #                 if prev_tok == current_tok:
-    #                     durations.append(durations[-1] + 1)
-    #                 else:
-    #                     durations.append(1)
-
-    #             durations = durations[::-1]
-
-    #             masks = [1]
-    #             for i in range(len(vqvae_tokens) - 1):
-    #                 current_tok = vqvae_tokens[i]
-    #                 next_tok = vqvae_tokens[i + 1]
-
-    #                 if next_tok == current_tok:
-    #                     masks.append(0)
-    #                 else:
-    #                     masks.append(1)
-
-    #             return {
-    #                 "tokens": vqvae_tokens,
-    #                 "values": self.appendages[index],
-    #                 "durations": durations,
-    #                 "masks": masks,
-    #                 "eegs": self.eegs[index],
-    #             }
-
-    #     else:
-    #         return self.regions[index], self.appendages[index], self.eegs[index]
+        return eeg, apps, tokens
 
     # @staticmethod
     # def collate_fn(batch):
