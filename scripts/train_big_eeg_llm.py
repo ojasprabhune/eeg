@@ -20,6 +20,7 @@ with open("config/eeg_llm.yaml", "r") as config_file:
     vocab_size = config["vocab_size"]
     num_layers = config["num_layers"]
     num_heads = config["num_heads"]
+    num_channels = config["num_channels"]
     embedding_dim = config["embedding_dim"]
     ffn_hidden_dim = config["ffn_hidden_dim"]
     qk_length = config["qk_length"]
@@ -50,6 +51,7 @@ model = EEGLLM(
     vocab_size=vocab_size,
     num_layers=num_layers,
     num_heads=num_heads,
+    num_channels=num_channels,
     embedding_dim=embedding_dim,
     ffn_hidden_dim=ffn_hidden_dim,
     qk_length=qk_length,
@@ -87,9 +89,9 @@ def train():
         for eeg, apps, tokens in iter_tqdm:
             # chunk: (B, T, C)
 
-            eeg = torch.tensor(eeg).to(device).float()
-            apps = torch.tensor(apps).to(device).float()
-            tokens = torch.tensor(tokens).to(device)
+            eeg = eeg.to(device).float()
+            apps = apps.to(device).float()
+            tokens = tokens.to(device)
 
             token_logits = model(eeg) # out: (B, T, vocab_size)
             token_logits = token_logits.transpose(1, 2) # (B, T, vocab_size) -> (B, vocab_size, T)

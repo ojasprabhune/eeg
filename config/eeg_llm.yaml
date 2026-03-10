@@ -3,7 +3,8 @@
 vocab_size: 512
 num_layers: 4
 num_heads: 4
-embedding_dim: 14
+num_channels: 14
+embedding_dim: 64
 ffn_hidden_dim: 64
 qk_length: 64
 value_length: 64

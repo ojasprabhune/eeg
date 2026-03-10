@@ -12,7 +12,8 @@ class EEGLLM(nn.Module):
         vocab_size: int = 512,
         num_layers: int = 4,
         num_heads: int = 4,
-        embedding_dim: int = 14,
+        num_channels: int = 14,
+        embedding_dim: int = 64,
         ffn_hidden_dim: int = 64,
         qk_length: int = 64,
         value_length: int = 64,
@@ -46,14 +47,19 @@ class EEGLLM(nn.Module):
             dropout=dropout
         )
 
+        self.linear1 = nn.Linear(num_channels, embedding_dim)
+        self.relu = nn.ReLU()
+
         self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         """
 
-        x_enc = self.encoder(x)
+        x = self.linear1(x) # (B, T, C) -> (B, T, embedding_dim)
+        x = self.relu(x)
 
+        x_enc = self.encoder(x)
         x_dec = self.decoder(x, x_enc)
 
         return x_dec
