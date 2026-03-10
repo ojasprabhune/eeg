@@ -122,7 +122,7 @@ class Encoder(nn.Module):
         value_length: int,
         max_length: int,
         dropout: float,
-    ):
+    ) -> None:
         """
         The EEG encoder will take in EEG data of shape (B, T, C) and will
         output an encoded representation of shape (B, T, C). The forward pass of

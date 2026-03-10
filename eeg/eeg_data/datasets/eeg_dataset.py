@@ -54,9 +54,9 @@ class EEGDataset(Dataset):
             self.raws.append(mne.io.read_raw_fif(path))
 
         # - filtering -
-        self.raw: mne.io.Raw = mne.concatenate_raws(self.raws, preload=True)
-        self.filtered = self.raw.copy().filter(l_freq=0.1, h_freq=50)  # band-pass filter
-        self.filtered = self.filtered.notch_filter(freqs=60)  # notch filtering
+        self.raw: mne.io.Raw = mne.concatenate_raws(self.raws, preload=True) # type: ignore
+        self.filtered = self.raw.copy().filter(l_freq=0.1, h_freq=50)
+        self.filtered = self.filtered.notch_filter(freqs=60)  # type: ignore
         self.filtered.set_eeg_reference("average", projection=False)  # common average reference
         self.filtered.filter(8, 30, method="iir", iir_params=dict(order=4, ftype="butter"))  # butterworth
 
@@ -66,11 +66,13 @@ class EEGDataset(Dataset):
             "O2","P8","T8","FC6","F4","F8","AF4"
         ]
         self.filtered.pick(self.eeg_channels)
+        self.filtered.resample(sfreq=29.973234)
 
         # TODO use accel + mag data & remove low EEG quality segments
         # TODO fix sampling frequencies for EEG and hand if required
 
-        self.eeg_data: np.ndarray = self.filtered.get_data()  # (C, T)
+        # (C, T)
+        self.eeg_data: np.ndarray = self.filtered.get_data() # type: ignore
         
         print(f"{Colors.OKGREEN}Filtered & processed EEG data.")
 
@@ -85,16 +87,8 @@ class EEGDataset(Dataset):
         self.data_joints = JointData(self.raw_app_data)
         self.app_data = appendages(self.data_joints)  # (T, 12)
         self.app_data = self.region_tokenizer.scaler.transform(self.app_data)
-        self.region_tokens = self.region_tokenizer.encode(torch.tensor(self.app_data))  # (T,)
 
         print(f"{Colors.OKGREEN}Retrieved appendage data.{Colors.ENDC}")
-
-        if print_shapes:
-            print("EEG shape:       ", self.eeg_data.shape) # (14, T)
-            print("raw app shape:   ", self.raw_app_data.shape) # (2, T, 63)
-            print("app shape:       ", self.app_data.shape) # (T, 12)
-            print("regions shape:   ", self.region_tokens.shape) # (T,)
-
         print(f"{Colors.OKGREEN}Successful retrieved all data.{Colors.ENDC}")
 
         # - vq-vae pre-computing -
@@ -116,18 +110,19 @@ class EEGDataset(Dataset):
             self.vqvae_tokens_all = np.concatenate(self.vqvae_tokens_all)
 
             if print_shapes:
+                print("EEG shape:          ", self.eeg_data.shape) # (14, T)
+                print("app shape:          ", self.app_data.shape) # (T, 12)
                 print("VQ-VAE tokens shape:", self.vqvae_tokens_all.shape) # (T,)
 
         # --- sequences ---
-        # self...
-        # self...
-        # self...
-        # self...
+        self.eeg_chunks = []
+        self.app_chunks = []
+        self.token_chunks = []
 
         # TODO sequencing
 
     def __len__(self) -> int:
-        return len(self.regions)
+        return len(self.eeg_chunks)
 
     # def __getitem__(self, index: int) -> tuple | dict[str, list[int]]:
     #     """
