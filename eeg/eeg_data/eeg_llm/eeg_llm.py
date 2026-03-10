@@ -12,7 +12,7 @@ class EEGLLM(nn.Module):
         vocab_size: int = 512,
         num_layers: int = 4,
         num_heads: int = 4,
-        embedding_dim: int = 64,
+        embedding_dim: int = 14,
         ffn_hidden_dim: int = 64,
         qk_length: int = 64,
         value_length: int = 64,
@@ -49,11 +49,11 @@ class EEGLLM(nn.Module):
         self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        print("input shape", x.shape)
-        quit()
-        
+        """
+        """
+
         x_enc = self.encoder(x)
 
         x_dec = self.decoder(x, x_enc)
 
-        return x
+        return x_dec

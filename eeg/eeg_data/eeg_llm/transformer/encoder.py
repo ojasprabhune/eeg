@@ -127,10 +127,9 @@ class Encoder(nn.Module):
         The EEG encoder will take in EEG data of shape (B, T, C) and will
         output an encoded representation of shape (B, T, C). The forward pass of
         the encoder consists of:
-        1. Turning the input into a sequence embedding
-        2. Positionally encoding that
-        3. Drop out
-        4. Then passing this through the encoder several times, outputting a hidden representation
+        1. Positional encoding
+        1. Drop out
+        1. Then passing this through the encoder several times, outputting a hidden representation
         """
         super().__init__()
 
@@ -142,15 +141,6 @@ class Encoder(nn.Module):
 
         self.qk_length = qk_length
         self.value_length = value_length
-
-        # Define any layers you'll need in the forward pass
-        # Hint: You may find `ModuleList`s useful for creating
-        # multiple layers in some kind of list comprehension.
-        #
-        # Recall that the input is just a sequence of tokens,
-        # so we'll have to first create some kind of embedding
-        # and then use the other layers we've implemented to
-        # build out the Transformer encoder.
 
         self.encoder_layers = nn.ModuleList(
             [

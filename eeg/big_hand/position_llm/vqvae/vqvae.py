@@ -8,9 +8,9 @@ from .vqvae_decoder import VQVAEDecoder
 class VQVAE(nn.Module):
     def __init__(
         self,
-        input_dim: int,
-        codebook_size: int,
-        embedding_dim: int,
+        input_dim: int = 12,
+        codebook_size: int = 512,
+        embedding_dim: int = 64,
         decay: float = 0.99
     ) -> None:
 

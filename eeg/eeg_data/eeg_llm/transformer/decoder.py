@@ -125,16 +125,6 @@ class Decoder(nn.Module):
         self.qk_length = qk_length
         self.value_length = value_length
 
-        # Define any layers you'll need in the forward pass
-        # Hint: You may find `ModuleList`s useful for creating
-        # multiple layers in some kind of list comprehension.
-        #
-        # Recall that the input is just a sequence of tokens,
-        # so we'll have to first create some kind of embedding
-        # and then use the other layers we've implemented to
-        # build out the Transformer decoder.
-
-        self.embedding = nn.Embedding(vocab_size, embedding_dim)
         self.decoder_layers = nn.ModuleList(
             [
                 DecoderLayer(
@@ -155,7 +145,6 @@ class Decoder(nn.Module):
         self.linear = nn.Linear(embedding_dim, vocab_size)
 
     def make_mask(self, x: torch.Tensor) -> torch.Tensor:
-        # dictionary of input embeddings
         """
         Create a mask to prevent attention to future tokens.
         """
@@ -171,9 +160,8 @@ class Decoder(nn.Module):
         The forward pass of the Decoder.
         """
 
-        sequence_embedding = self.embedding(x)  # (B, T, C)
-        decode_mask = self.make_mask(sequence_embedding)
-        x = self.positional_encoding(sequence_embedding)
+        decode_mask = self.make_mask(x)
+        x = self.positional_encoding(x)
         x = self.dropout(x)
         for decoder_layer in self.decoder_layers:
             x = decoder_layer(x, enc_x, decode_mask)
