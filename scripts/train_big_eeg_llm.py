@@ -39,8 +39,8 @@ with open("config/eeg_llm.yaml", "r") as config_file:
     save_ckpt_path = config["save_ckpt_path"]
     save_every = config["save_every"]
 
-hand_dataset: EEGDataset = EEGDataset()
-hand_dataloader = DataLoader(hand_dataset, batch_size=32, shuffle=True)
+eeg_dataset: EEGDataset = EEGDataset()
+hand_dataloader = DataLoader(eeg_dataset, batch_size=32, shuffle=True)
 
 model = EEGLLM(
     vocab_size=vocab_size,
@@ -100,24 +100,24 @@ def train():
             loss.backward()  # calculates and adds gradients to params so optim sees
             optimizer.step()  # optim looks at gradients and steps accordingly
 
-        # if (i + 1) % save_every == 0:
-        #     latest_ckpt = {
-        #         "epochs": i,
-        #         "model": model.state_dict(),
-        #         "optimizer": optimizer.state_dict(),
-        #     }
+        if (i + 1) % save_every == 0:
+            latest_ckpt = {
+                "epochs": i,
+                "model": model.state_dict(),
+                "optimizer": optimizer.state_dict(),
+            }
 
-        #     torch.save(latest_ckpt, f"{save_ckpt_path}_epoch_{i + 1}.pth")
+            torch.save(latest_ckpt, f"{save_ckpt_path}_epoch_{i + 1}.pth")
 
     run.finish()
 
 
 train()
 
-# latest_ckpt = {
-#     "epochs": epochs,
-#     "model": model.state_dict(),
-#     "optimizer": optimizer.state_dict(),
-# }
+latest_ckpt = {
+    "epochs": epochs,
+    "model": model.state_dict(),
+    "optimizer": optimizer.state_dict(),
+}
 
-# torch.save(latest_ckpt, save_ckpt_path)
+torch.save(latest_ckpt, save_ckpt_path)

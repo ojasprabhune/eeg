@@ -132,22 +132,46 @@ class EEGDataset(Dataset):
         if print_shapes:
             print(f"{Colors.WARNING}total # of chunks: {self.__len__()}{Colors.ENDC}")
 
-        # TODO split into train and val sets
+        # --- train-val split ---
+
+        # index at 80% on time dim
+        self.split_idx = int(len(self.eeg_chunks) * 0.8)
+
+        self.eeg_chunks = np.array(self.eeg_chunks)
+        self.app_chunks = np.array(self.app_chunks)
+        self.token_chunks = np.array(self.token_chunks)
+
+        self.train_eeg_chunks = self.eeg_chunks[:self.split_idx, :, :]
+        self.train_app_chunks = self.app_chunks[:self.split_idx, :, :]
+        self.train_token_chunks = self.token_chunks[:self.split_idx]
+
+        self.val_eeg_chunks = self.eeg_chunks[self.split_idx:, :, :]
+        self.val_app_chunks = self.app_chunks[self.split_idx:, :, :]
+        self.val_token_chunks = self.token_chunks[self.split_idx:]
 
     def __len__(self) -> int:
-        return len(self.eeg_chunks)
+        return len(self.train_eeg_chunks)
 
-    def __getitem__(
-        self,
-        index: int
-    ) -> tuple[list[list[int]], list[list[int]], list[int]]:
+    def __getitem__(self, index: int) -> tuple[list[list[int]], list[list[int]], list[int]]:
         """
         Returns the EEG data, appendage data, and VQ-VAE tokens for the given
-        index.
+        index from the training set.
         """
 
-        eeg: list[list[int]] = self.eeg_chunks[index]
-        apps: list[list[int]] = self.app_chunks[index]
-        tokens: list[int] = self.token_chunks[index]
+        eeg: list[list[int]] = self.train_eeg_chunks[index]
+        apps: list[list[int]] = self.train_app_chunks[index]
+        tokens: list[int] = self.train_token_chunks[index]
+
+        return eeg, apps, tokens
+
+    def get_val_data(self, index: int) -> tuple[list[list[int]], list[list[int]], list[int]]:
+        """
+        Returns the EEG data, appendage data, and VQ-VAE tokens for the given
+        index from the validation set.
+        """
+
+        eeg: list[list[int]] = self.val_eeg_chunks[index]
+        apps: list[list[int]] = self.val_app_chunks[index]
+        tokens: list[int] = self.val_token_chunks[index]
 
         return eeg, apps, tokens
