@@ -132,6 +132,8 @@ class EEGDataset(Dataset):
         if print_shapes:
             print(f"{Colors.WARNING}total # of chunks: {self.__len__()}{Colors.ENDC}")
 
+        # TODO split into train and val sets
+
     def __len__(self) -> int:
         return len(self.eeg_chunks)
 

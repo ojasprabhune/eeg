@@ -54,6 +54,12 @@ class EEGLLM(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
+        The forward pass of the EEG LLM consists of:
+        1. An input: EEG data of shape (B, T, num_channels)
+        1. Linear projection to embedding dimension: (B, T, embedding_dim)
+        1. Encoding the EEG data to a hidden representation
+        1. Decoding the hidden representation to output token logits:
+        (B, T, vocab_size)
         """
 
         x = self.linear1(x) # (B, T, C) -> (B, T, embedding_dim)

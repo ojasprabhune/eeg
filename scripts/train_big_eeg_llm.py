@@ -26,11 +26,6 @@ with open("config/eeg_llm.yaml", "r") as config_file:
     qk_length = config["qk_length"]
     value_length = config["value_length"]
     max_length = config["max_length"]
-
-    num_channels = config["num_channels"]
-    num_times = config["num_times"]
-    num_outputs = config["num_outputs"]
-
     dropout = config["dropout"]
 
     device = config["device"]

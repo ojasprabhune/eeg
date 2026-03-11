@@ -10,10 +10,6 @@ qk_length: 64
 value_length: 64
 max_length: 2048
 
-num_channels: 64
-num_times: 800
-num_outputs: 0
-
 dropout: 0.1
 
 # training
