@@ -128,18 +128,15 @@ class EEGDataset(Dataset):
                 self.eeg_chunks.append(eeg_chunk)
                 self.app_chunks.append(app_chunk)
                 self.token_chunks.append(token_chunk)
-        
-        if print_shapes:
-            print(f"{Colors.WARNING}total # of chunks: {self.__len__()}{Colors.ENDC}")
 
         # --- train-val split ---
 
         # index at 80% on time dim
         self.split_idx = int(len(self.eeg_chunks) * 0.8)
 
-        self.eeg_chunks = np.array(self.eeg_chunks)
-        self.app_chunks = np.array(self.app_chunks)
-        self.token_chunks = np.array(self.token_chunks)
+        self.eeg_chunks = np.array(self.eeg_chunks, dtype=np.float32)
+        self.app_chunks = np.array(self.app_chunks, dtype=np.float32)
+        self.token_chunks = np.array(self.token_chunks, dtype=np.int64)
 
         self.train_eeg_chunks = self.eeg_chunks[:self.split_idx, :, :]
         self.train_app_chunks = self.app_chunks[:self.split_idx, :, :]
@@ -148,6 +145,9 @@ class EEGDataset(Dataset):
         self.val_eeg_chunks = self.eeg_chunks[self.split_idx:, :, :]
         self.val_app_chunks = self.app_chunks[self.split_idx:, :, :]
         self.val_token_chunks = self.token_chunks[self.split_idx:]
+        
+        if print_shapes:
+            print(f"{Colors.WARNING}total # of chunks: {self.__len__()}{Colors.ENDC}")
 
     def __len__(self) -> int:
         return len(self.train_eeg_chunks)
