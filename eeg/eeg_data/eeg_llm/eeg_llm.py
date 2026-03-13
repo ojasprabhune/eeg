@@ -48,11 +48,19 @@ class EEGLLM(nn.Module):
         )
 
         self.linear1 = nn.Linear(num_channels, embedding_dim)
-        self.relu = nn.ReLU()
+
+        self.duration_prediction_linear1 = nn.Linear(
+            embedding_dim, embedding_dim)
+        self.duration_prediction_linear2 = nn.Linear(
+            embedding_dim, embedding_dim)
+        self.duration_prediction_linear3 = nn.Linear(
+            embedding_dim, embedding_dim)
+        self.duration_prediction_linear4 = nn.Linear(embedding_dim, 1)
 
         self.dropout = nn.Dropout(p=dropout)
+        self.relu = nn.ReLU()
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """
         The forward pass of the EEG LLM consists of:
         1. An input: EEG data of shape (B, T, num_channels)
@@ -66,6 +74,14 @@ class EEGLLM(nn.Module):
         x = self.relu(x)
 
         x_enc = self.encoder(x)
-        x_dec = self.decoder(x, x_enc)
+        x_dec, vocab_distribution = self.decoder(x, x_enc)
 
-        return x_dec
+        durations = self.duration_prediction_linear1(x_dec)
+        durations = self.relu(durations)
+        durations = self.duration_prediction_linear2(durations)
+        durations = self.relu(durations)
+        durations = self.duration_prediction_linear3(durations)
+        durations = self.relu(durations)
+        durations = self.duration_prediction_linear4(durations).unsqueeze(-1)
+
+        return vocab_distribution, durations

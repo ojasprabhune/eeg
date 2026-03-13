@@ -155,7 +155,7 @@ class Decoder(nn.Module):
 
         return out
 
-    def forward(self, x: torch.Tensor, enc_x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, enc_x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """
         The forward pass of the Decoder.
         """
@@ -165,6 +165,6 @@ class Decoder(nn.Module):
         x = self.dropout(x)
         for decoder_layer in self.decoder_layers:
             x = decoder_layer(x, enc_x, decode_mask)
-        x = self.linear(x)
+        vocab_distribution = self.linear(x)
 
-        return x # (B, T, vocab_size)
+        return x, vocab_distribution # (B, T, C), (B, T, vocab_size)

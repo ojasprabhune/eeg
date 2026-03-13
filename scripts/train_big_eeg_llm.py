@@ -7,7 +7,8 @@ components and LaBraM.
 import yaml
 import torch
 import wandb
-from torch.nn import CrossEntropyLoss
+import numpy as np
+from torch.nn import CrossEntropyLoss, L1Loss
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -27,6 +28,7 @@ with open("config/eeg_llm.yaml", "r") as config_file:
     value_length = config["value_length"]
     max_length = config["max_length"]
     dropout = config["dropout"]
+    lambda_duration = config["lambda_duration"]
 
     device = config["device"]
     batch_size = config["batch_size"]
@@ -88,19 +90,26 @@ def train():
             eeg = eeg.to(device).float()
             apps = apps.to(device).float()
             tokens = tokens.to(device)
-            durations = durations.to(device)
-            masks = masks.to(device)
+            durations = torch.tensor(durations).to(device)
+            masks = torch.tensor(masks).to(device)
 
-            token_logits = model(eeg) # out: (B, T, vocab_size)
+            token_logits, durations_logits = model(eeg) # out: (B, T, vocab_size), (B, T)
             token_logits = token_logits.transpose(1, 2) # (B, T, vocab_size) -> (B, vocab_size, T)
 
-            loss = loss_fn(token_logits, tokens)
+            token_loss = class_loss_fn(token_logits, tokens)
+            token_loss = (token_loss * masks).sum() / (masks.sum() + 1e-8)
 
-            iter_tqdm.set_postfix({"loss": loss.item()})
-            run.log({"loss": loss.item()})
+            duration_loss = duration_loss_fn(durations_logits, durations)
+            duration_loss = (duration_loss * masks).sum() / (masks.sum() + 1e-8)
+
+            total_loss = token_loss + lambda_duration * duration_loss
+
+            iter_tqdm.set_postfix({"loss": total_loss.item()})
+            run.log({"token loss": token_loss.item()})
+            run.log({"duration loss": duration_loss.item()})
 
             optimizer.zero_grad()  # optimizer has access to all model params, makes grads 0
-            loss.backward()  # calculates and adds gradients to params so optim sees
+            total_loss.backward()  # calculates and adds gradients to params so optim sees
             optimizer.step()  # optim looks at gradients and steps accordingly
 
         if (i + 1) % save_every == 0:

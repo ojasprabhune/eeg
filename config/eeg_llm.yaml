@@ -9,6 +9,7 @@ ffn_hidden_dim: 64
 qk_length: 64
 value_length: 64
 max_length: 2048
+lambda_duration: 5
 
 dropout: 0.1
 
