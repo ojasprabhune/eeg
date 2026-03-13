@@ -152,7 +152,7 @@ class EEGDataset(Dataset):
     def __len__(self) -> int:
         return len(self.train_eeg_chunks)
 
-    def __getitem__(self, index: int) -> tuple[list[list[int]], list[list[int]], list[int]]:
+    def __getitem__(self, index: int) -> tuple[list[list[int]], list[list[int]], list[int], list[int], list[int]]:
         """
         Returns the EEG data, appendage data, and VQ-VAE tokens for the given
         index from the training set.
@@ -162,7 +162,32 @@ class EEGDataset(Dataset):
         apps: list[list[int]] = self.train_app_chunks[index]
         tokens: list[int] = self.train_token_chunks[index]
 
-        return eeg, apps, tokens
+        # vqvae_tokens: (T,)
+        reversed_tokens = tokens[::-1]
+        durations = [1]
+        for i in range(1, len(reversed_tokens)):
+            # counting backwards
+            current_tok = reversed_tokens[i]
+            prev_tok = reversed_tokens[i - 1]
+
+            if prev_tok == current_tok:
+                durations.append(durations[-1] + 1)
+            else:
+                durations.append(1)
+        
+        durations = durations[::-1]
+
+        masks = [1]
+        for i in range(len(tokens) - 1):
+            current_tok = tokens[i]
+            next_tok = tokens[i + 1]
+
+            if next_tok == current_tok:
+                masks.append(0)
+            else:
+                masks.append(1)
+
+        return eeg, apps, tokens, durations, masks
 
     def get_val_data(self, index: int) -> tuple[list[list[int]], list[list[int]], list[int]]:
         """

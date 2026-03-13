@@ -56,7 +56,8 @@ model = EEGLLM(
 )
 
 optimizer = AdamW(model.parameters(), lr=base_lr, betas=(0.9, 0.98), eps=1e-9)
-loss_fn = CrossEntropyLoss()
+class_loss_fn = CrossEntropyLoss(reduction="none")
+duration_loss_fn = L1Loss(reduction="none")
 
 model.to(device)
 
@@ -81,12 +82,14 @@ def train():
 
 
         iter_tqdm = tqdm(hand_dataloader, dynamic_ncols=True)
-        for eeg, apps, tokens in iter_tqdm:
+        for eeg, apps, tokens, durations, masks in iter_tqdm:
             # chunk: (B, T, C)
 
             eeg = eeg.to(device).float()
             apps = apps.to(device).float()
             tokens = tokens.to(device)
+            durations = durations.to(device)
+            masks = masks.to(device)
 
             token_logits = model(eeg) # out: (B, T, vocab_size)
             token_logits = token_logits.transpose(1, 2) # (B, T, vocab_size) -> (B, vocab_size, T)

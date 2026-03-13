@@ -1,4 +1,3 @@
-import matplotlib
 import numpy as np
 import torch
 from torch.nn import CrossEntropyLoss
@@ -90,7 +89,7 @@ def train():
         optimizer.step()  # optim looks at gradients and steps accordingly
 
 
-def inference(model: torch.nn.Module) -> torch.Tensor:
+def inference(model: torch.nn.Module) -> tuple[list, torch.Tensor]:
     all_region_tokens = region_tokens.unsqueeze(0).to(torch.int64)
 
     first_region_token = all_region_tokens[:, 0]
