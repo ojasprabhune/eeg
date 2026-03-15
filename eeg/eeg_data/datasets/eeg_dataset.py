@@ -183,13 +183,13 @@ class EEGDataset(Dataset):
             next_tok = tokens[i + 1]
 
             if next_tok == current_tok:
-                masks.append(1e-3)
+                masks.append(1e-4)
             else:
                 masks.append(1)
 
         return torch.tensor(eeg), torch.tensor(apps), torch.tensor(tokens), torch.tensor(durations), torch.tensor(masks)
 
-    def get_val_data(self, index: int) -> tuple[list[list[int]], list[list[int]], list[int]]:
+    def get_val_data(self, index: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Returns the EEG data, appendage data, and VQ-VAE tokens for the given
         index from the validation set.
@@ -199,4 +199,4 @@ class EEGDataset(Dataset):
         apps: list[list[int]] = self.val_app_chunks[index]
         tokens: list[int] = self.val_token_chunks[index]
 
-        return eeg, apps, tokens
+        return torch.tensor(eeg), torch.tensor(apps), torch.tensor(tokens)

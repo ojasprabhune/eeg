@@ -90,8 +90,8 @@ def train():
             eeg = eeg.to(device).float()
             apps = apps.to(device).float()
             tokens = tokens.to(device)
-            durations = torch.tensor(durations).to(device)
-            masks = torch.tensor(masks).to(device)
+            durations = durations.to(device)
+            masks = masks.to(device)
 
             token_logits, durations_logits = model(eeg) # out: (B, T, vocab_size), (B, T)
             token_logits = token_logits.transpose(1, 2) # (B, T, vocab_size) -> (B, vocab_size, T)
@@ -111,6 +111,7 @@ def train():
             optimizer.zero_grad()  # optimizer has access to all model params, makes grads 0
             total_loss.backward()  # calculates and adds gradients to params so optim sees
             optimizer.step()  # optim looks at gradients and steps accordingly
+
 
         if (i + 1) % save_every == 0:
             latest_ckpt = {

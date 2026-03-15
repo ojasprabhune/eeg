@@ -82,6 +82,6 @@ class EEGLLM(nn.Module):
         durations = self.relu(durations)
         durations = self.duration_prediction_linear3(durations)
         durations = self.relu(durations)
-        durations = self.duration_prediction_linear4(durations).unsqueeze(-1)
+        durations = self.duration_prediction_linear4(durations).squeeze(-1)
 
         return vocab_distribution, durations
