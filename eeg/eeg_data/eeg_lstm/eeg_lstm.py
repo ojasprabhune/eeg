@@ -37,7 +37,7 @@ class EEGLSTM(nn.Module):
         3. Linear layer projection to shape (B, T, vocab_size)
         """
 
-        x = self.lstm(x)
-        x, (h_n, c_n) = self.linear(x)
+        x, (h_n, c_n) = self.lstm(x)
+        x = self.linear(x)
 
         return x

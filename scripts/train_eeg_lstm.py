@@ -1,5 +1,5 @@
 """
-Train an EEGLLM to predict to Ojas's hand movements from his brain signals.
+Train an BLSTM to predict to Ojas's hand movements from his brain signals.
 Implement all previous techniques like VQVAE tokenization on appendage vector
 components.
 """
@@ -13,22 +13,16 @@ from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from eeg.eeg_data import EEGDataset, EEGLLM
+from eeg.eeg_data import LSTMDataset, EEGLSTM
 
-with open("config/eeg_llm.yaml", "r") as config_file:
+with open("config/eeg_lstm.yaml", "r") as config_file:
     config = yaml.safe_load(config_file)
 
     vocab_size = config["vocab_size"]
     num_layers = config["num_layers"]
-    num_heads = config["num_heads"]
     num_channels = config["num_channels"]
     embedding_dim = config["embedding_dim"]
-    ffn_hidden_dim = config["ffn_hidden_dim"]
-    qk_length = config["qk_length"]
-    value_length = config["value_length"]
-    max_length = config["max_length"]
     dropout = config["dropout"]
-    lambda_duration = config["lambda_duration"]
 
     device = config["device"]
     batch_size = config["batch_size"]
@@ -41,27 +35,23 @@ with open("config/eeg_llm.yaml", "r") as config_file:
     save_ckpt_path = config["save_ckpt_path"]
     save_every = config["save_every"]
 
-eeg_dataset: EEGDataset = EEGDataset()
+eeg_dataset: LSTMDataset = LSTMDataset()
 hand_dataloader = DataLoader(eeg_dataset, batch_size=32, shuffle=True)
 
-model = EEGLLM(
+model = EEGLSTM(
     vocab_size=vocab_size,
     num_layers=num_layers,
-    num_heads=num_heads,
     num_channels=num_channels,
     embedding_dim=embedding_dim,
-    ffn_hidden_dim=ffn_hidden_dim,
-    qk_length=qk_length,
-    value_length=value_length,
-    max_length=max_length,
     dropout=dropout
 )
 
 optimizer = AdamW(model.parameters(), lr=base_lr, betas=(0.9, 0.98), eps=1e-9)
-class_loss_fn = CrossEntropyLoss(reduction="none")
-duration_loss_fn = L1Loss(reduction="none")
+class_loss_fn = CrossEntropyLoss()
 
 model.to(device)
+trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+print(f"Trainable parameters: {trainable_params}")
 
 def train():
     run = wandb.init(
@@ -70,7 +60,7 @@ def train():
         project="eeg",
         config={
             "learning_rate": base_lr,
-            "architecture": "Transformer",
+            "architecture": "BLSTM",
             "dataset": "eeg_dataset",
             "epochs": epochs,
         },
@@ -90,26 +80,17 @@ def train():
             eeg = eeg.to(device).float()
             apps = apps.to(device).float()
             tokens = tokens.to(device)
-            durations = durations.to(device)
-            masks = masks.to(device)
 
-            token_logits, durations_logits = model(eeg) # out: (B, T, vocab_size), (B, T)
+            token_logits = model(eeg) # out: (B, T, vocab_size), (B, T)
             token_logits = token_logits.transpose(1, 2) # (B, T, vocab_size) -> (B, vocab_size, T)
 
-            token_loss = class_loss_fn(token_logits, tokens)
-            token_loss = (token_loss * masks).sum() / (masks.sum() + 1e-8)
+            loss = class_loss_fn(token_logits, tokens)
 
-            duration_loss = duration_loss_fn(durations_logits, durations)
-            duration_loss = (duration_loss * masks).sum() / (masks.sum() + 1e-8)
-
-            total_loss = token_loss + lambda_duration * duration_loss
-
-            iter_tqdm.set_postfix({"loss": total_loss.item()})
-            run.log({"token loss": token_loss.item()})
-            run.log({"duration loss": duration_loss.item()})
+            iter_tqdm.set_postfix({"loss": loss.item()})
+            run.log({"loss": loss.item()})
 
             optimizer.zero_grad()  # optimizer has access to all model params, makes grads 0
-            total_loss.backward()  # calculates and adds gradients to params so optim sees
+            loss.backward()  # calculates and adds gradients to params so optim sees
             optimizer.step()  # optim looks at gradients and steps accordingly
 
 
