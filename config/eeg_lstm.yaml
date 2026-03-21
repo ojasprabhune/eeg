@@ -1,15 +1,17 @@
 # eeg_llm
 
 vocab_size: 512
-num_layers: 8
+num_layers: 2
 num_channels: 14
 embedding_dim: 128
+kernel_size_temporal: 7
 dropout: 0.1
 
 # training
 
 device: cpu 
 batch_size: 32
+sequence_length: 10
 warmup_steps: 4000
 base_lr: 5e-5
 epochs: 5000
@@ -18,4 +20,4 @@ run_name: eeg_lstm
 # use_ckpt_path: /var/log/thavamount/eeg_ckpts/eeg_lm/eeg_llm.pth
 use_ckpt_path: None
 save_ckpt_path: /var/log/thavamount/eeg_ckpts/eeg_lm/lstm/eeg_lstm
-save_every: 250
+save_every: 50

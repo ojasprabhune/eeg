@@ -22,10 +22,12 @@ with open("config/eeg_lstm.yaml", "r") as config_file:
     num_layers = config["num_layers"]
     num_channels = config["num_channels"]
     embedding_dim = config["embedding_dim"]
+    kernel_size_temporal = config["kernel_size_temporal"]
     dropout = config["dropout"]
 
     device = config["device"]
     batch_size = config["batch_size"]
+    sequence_length = config["sequence_length"]
     warmup_steps = config["warmup_steps"]
     base_lr = float(config["base_lr"])
     epochs = config["epochs"]
@@ -35,7 +37,7 @@ with open("config/eeg_lstm.yaml", "r") as config_file:
     save_ckpt_path = config["save_ckpt_path"]
     save_every = config["save_every"]
 
-eeg_dataset: LSTMDataset = LSTMDataset()
+eeg_dataset: LSTMDataset = LSTMDataset(seq_len=sequence_length, device=device)
 hand_dataloader = DataLoader(eeg_dataset, batch_size=32, shuffle=True)
 
 model = EEGLSTM(
@@ -43,6 +45,7 @@ model = EEGLSTM(
     num_layers=num_layers,
     num_channels=num_channels,
     embedding_dim=embedding_dim,
+    kernel_size_temporal=kernel_size_temporal,
     dropout=dropout
 )
 
