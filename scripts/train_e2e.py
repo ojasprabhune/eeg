@@ -18,14 +18,13 @@ delta_tokenizer = DeltaTokenizer()  # delta tokenizer
 scaler = region_tokenizer.scaler
 
 data = np.load("data/open_fist_front.npy")  # load file
-data = scaler.transform(data)  # standardize before processing
+data = np.array(scaler.transform(data))  # standardize before processing
 deltas = np.diff(data, axis=0)  # difference between time steps
 deltas = normalize(deltas, deltas.max(), deltas.min(), 10, -10)  # crunch
 deltas = np.round(deltas, decimals=1)  # round to tenths
 
 delta_tokens = delta_tokenizer.encode(deltas)[:100]  # deltas -> tokens
 region_tokens = region_tokenizer.encode(delta_tokens)  # (100,)
-
 
 # raw pos: expected (T, 63)
 # DTokens: expected (T, 63)
@@ -43,7 +42,7 @@ loss_fn = CrossEntropyLoss()
 
 def train():
     iter_tqdm = tqdm(range(2000))
-    for i in iter_tqdm:
+    for _ in iter_tqdm:
         # mac torch expects Long, which is the same as int64, so we convert
         # positional encoding needs a batch size
         all_delta_tokens = delta_tokens.unsqueeze(0).to(torch.int64)

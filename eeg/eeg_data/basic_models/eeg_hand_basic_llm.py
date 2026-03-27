@@ -4,7 +4,6 @@ import torch
 import torch.nn as nn
 
 from .transformer.decoder import Decoder
-from braindecode.models import Labram 
 
 
 class EEGLLM(nn.Module):
@@ -22,20 +21,17 @@ class EEGLLM(nn.Module):
         qk_length: int,
         value_length: int,
         max_length: int,
-
         num_channels: int,
         num_times: int,
         num_outputs: int,
-
         dropout: float,
-
-        labram_pretrained_path: str = "scripts/models/labram_nc64_nt800_backbone.pt"
+        labram_pretrained_path: str = "scripts/models/labram_nc64_nt800_backbone.pt",
     ) -> None:
-        """
-
-        """
+        """ """
 
         super().__init__()
+
+        from braindecode.models import Labram
 
         self.vocab_size = vocab_size
         self.num_layers = num_layers
@@ -53,9 +49,11 @@ class EEGLLM(nn.Module):
         self.dropout = dropout
 
         # --- LaBraM ---
-        self.labram = Labram(n_chans=num_channels, n_times=num_times, n_outputs=num_outputs)
+        self.labram = Labram(
+            n_chans=num_channels, n_times=num_times, n_outputs=num_outputs
+        )
         self.pretrained_state = torch.load(labram_pretrained_path, map_location="cuda")
-        self.labram.load_state_dict(self.pretrained_state)       
+        self.labram.load_state_dict(self.pretrained_state)
 
         # freeze labram parameters
         for param in self.labram.parameters():
@@ -69,16 +67,15 @@ class EEGLLM(nn.Module):
 
         # --- Decoder ---
         self.decoder = Decoder(
-            vocab_size = vocab_size,
-            num_layers = num_layers,
-            num_heads = num_heads,
-            embedding_dim = embedding_dim,
-            ffn_hidden_dim = ffn_hidden_dim,
-            qk_length = qk_length,
-            value_length = value_length,
-            max_length = max_length 
-            )
-
+            vocab_size=vocab_size,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            embedding_dim=embedding_dim,
+            ffn_hidden_dim=ffn_hidden_dim,
+            qk_length=qk_length,
+            value_length=value_length,
+            max_length=max_length,
+        )
 
     def forward(self, x: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         """
@@ -88,9 +85,11 @@ class EEGLLM(nn.Module):
         (0, 1, 2) of size (B, T, vocab_size).
         """
 
-        h = self.labram.forward_features(x, return_patch_tokens=True)   # h: (B, num_patches, T)
-        h = h.transpose(-1, -2)                                         # h: (B, T, num_patches)
-        h = self.embedding_dim_linear(h)                                # h: (B, T, C)
-        x = self.decoder(target, h)                                     # x: (B, T, vocab_size)
+        h = self.labram.forward_features(
+            x, return_patch_tokens=True
+        )  # h: (B, num_patches, T)
+        h = h.transpose(-1, -2)  # h: (B, T, num_patches)
+        h = self.embedding_dim_linear(h)  # h: (B, T, C)
+        x = self.decoder(target, h)  # x: (B, T, vocab_size)
 
         return x
