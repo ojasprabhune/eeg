@@ -24,6 +24,7 @@ if eeg_data_path.endswith(".edf") or hand_data_path.endswith(".npy"):
     print(f"{Colors.FAIL}Error: Paths should not include file extensions.{Colors.ENDC}")
     quit()
 
+
 def trim_recording(
     eeg_data_path: str,
     hand_data_path: str,
@@ -31,7 +32,7 @@ def trim_recording(
     hand_trim_start_seconds: float,
     start_offset_seconds: float,
     output_edf_path=None,
-    output_npy_path=None
+    output_npy_path=None,
 ) -> None:
 
     # --- EEG ---
@@ -73,19 +74,29 @@ def trim_recording(
     print(f"EEG data shape: {Colors.BOLD}{raw.get_data().shape}{Colors.ENDC}")
     print(f"Hand data shape: {Colors.BOLD}{hand_data.shape}{Colors.ENDC}\n")
 
-    print(f"{Colors.OKCYAN}EEG data length before: {round(initial_eeg_length, 1)} seconds.{Colors.ENDC}")
-    print(f"{Colors.OKCYAN}Hand data length before: {round(initial_hand_length, 1)} seconds.{Colors.ENDC}\n")
+    print(
+        f"{Colors.OKCYAN}EEG data length before: {round(initial_eeg_length, 1)} seconds.{Colors.ENDC}"
+    )
+    print(
+        f"{Colors.OKCYAN}Hand data length before: {round(initial_hand_length, 1)} seconds.{Colors.ENDC}\n"
+    )
 
-    print(f"{Colors.OKGREEN}EEG data length after: {round(final_eeg_length, 1)} seconds.{Colors.ENDC}")
-    print(f"{Colors.OKGREEN}Hand data length after: {round(final_hand_length, 1)} seconds.{Colors.ENDC}\n")
+    print(
+        f"{Colors.OKGREEN}EEG data length after: {round(final_eeg_length, 1)} seconds.{Colors.ENDC}"
+    )
+    print(
+        f"{Colors.OKGREEN}Hand data length after: {round(final_hand_length, 1)} seconds.{Colors.ENDC}\n"
+    )
 
     print("start seconds EEG:", start_seconds)
     print("start seconds hand:", start_frame / fps, "\n")
+
 
 trim_recording(
     eeg_data_path,
     hand_data_path,
     eeg_trim_start_seconds=args.eeg_trim_start_seconds,
     hand_trim_start_seconds=args.hand_trim_start_seconds,
-    start_offset_seconds=args.start_offset_seconds
+    start_offset_seconds=args.start_offset_seconds,
 )
+

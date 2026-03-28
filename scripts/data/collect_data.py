@@ -19,14 +19,16 @@ parser.add_argument(
     "--webcam",
     type=bool,
     default=False,
-    help="Either run on webcam video or video file"
+    help="Either run on webcam video or video file",
 )
-parser.add_argument("--no_imshow", action="store_true", help="Do not show OpenCV window")
+parser.add_argument(
+    "--no_imshow", action="store_true", help="Do not show OpenCV window"
+)
 parser.add_argument(
     "--input_video",
     type=str,
     default="",
-    help="Video file to run estimation on (if selected)"
+    help="Video file to run estimation on (if selected)",
 )
 parser.add_argument(
     "--save_video",
@@ -37,8 +39,7 @@ parser.add_argument(
 parser.add_argument(
     "--plot", type=bool, default=False, help="Plots the results if True"
 )
-parser.add_argument("--joint", type=str, default="W",
-                    help="Joint data to plot")
+parser.add_argument("--joint", type=str, default="W", help="Joint data to plot")
 
 args = parser.parse_args()
 
@@ -54,7 +55,9 @@ num_frames = args.data_time * 30
 input_video_path = args.input_video
 
 
-def hand_detection(mp_hands, mp_drawing, joint_data_world: list, joint_data_norm: list, set_fps: int):
+def hand_detection(
+    mp_hands, mp_drawing, joint_data_world: list, joint_data_norm: list, set_fps: int
+):
     cur_frame = 1
 
     # getting camera / webcam (0, 1, 2 for connected webcams)
@@ -67,6 +70,8 @@ def hand_detection(mp_hands, mp_drawing, joint_data_world: list, joint_data_norm
     cap.set(cv2.CAP_PROP_FPS, set_fps)
     # verify FPS
     fps = cap.get(cv2.CAP_PROP_FPS)
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    print(f"Total frames in video: {total_frames}")
     # log FPS for verification
     print(f"Set FPS: {set_fps}\nFPS: {fps}")
 
@@ -124,9 +129,11 @@ def hand_detection(mp_hands, mp_drawing, joint_data_world: list, joint_data_norm
 
             if results.multi_hand_landmarks:
                 mp_drawing.draw_landmarks(
-                    frame, results.multi_hand_landmarks[0], mp_hands.HAND_CONNECTIONS,
+                    frame,
+                    results.multi_hand_landmarks[0],
+                    mp_hands.HAND_CONNECTIONS,
                     mp_drawing_styles.get_default_hand_landmarks_style(),
-                    mp_drawing_styles.get_default_hand_connections_style()
+                    mp_drawing_styles.get_default_hand_connections_style(),
                 )
 
                 # metric
@@ -138,11 +145,13 @@ def hand_detection(mp_hands, mp_drawing, joint_data_world: list, joint_data_norm
                 # extend lists by new landmark positions
                 for world_landmark in hand_landmarks.landmark:
                     frame_data_world.extend(
-                        [world_landmark.x, world_landmark.y, world_landmark.z])
+                        [world_landmark.x, world_landmark.y, world_landmark.z]
+                    )
 
                 for norm_landmark in hand_landmarks_norm.landmark:
                     frame_data_norm.extend(
-                        [norm_landmark.x, norm_landmark.y, norm_landmark.z])
+                        [norm_landmark.x, norm_landmark.y, norm_landmark.z]
+                    )
 
                 # add time step to data
                 joint_data_world.append(frame_data_world)
@@ -151,7 +160,7 @@ def hand_detection(mp_hands, mp_drawing, joint_data_world: list, joint_data_norm
             # render image to screen using OpenCV with "Hand tracking" window title
             if not args.no_imshow:
                 cv2.imshow("Hand tracking", frame)
-                
+
                 # hit "q" and close window
                 if cv2.waitKey(10) & 0xFF == ord("q"):
                     break
