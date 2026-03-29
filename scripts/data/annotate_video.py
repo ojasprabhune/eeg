@@ -1,10 +1,19 @@
 import argparse
-import textwrap
+import os
+import warnings
 
+import absl.logging
 import cv2
 import numpy as np
 
 from eeg.eeg_data.datasets.utils import Colors
+
+warnings.filterwarnings("ignore", category=UserWarning, module="google.protobuf")
+
+absl.logging.set_verbosity(absl.logging.ERROR)
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"  # hides INFO + WARNING
+
 
 # --- ARGPARSE ---
 parser = argparse.ArgumentParser(description="video labeler: press 1-4 to label frames")
@@ -47,13 +56,16 @@ while cap.isOpened():
     y0, dy = 50, 30  # starting y and line spacing
     for i, line in enumerate([diagnostic1, diagnostic2, diagnostic3, diagnostic4]):
         y = y0 + i * dy
+        color = (
+            (0, 255, 0) if i == 3 else (255, 255, 255)
+        )  # highlight current label line
         cv2.putText(
             frame,
             line,
             (30, y),
             cv2.FONT_HERSHEY_SIMPLEX,
             1,
-            (255, 255, 255),
+            color,
             2,
             cv2.LINE_AA,
         )

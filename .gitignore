@@ -12,3 +12,4 @@ out/
 *.egg-info/
 data/dataset/
 **wandb/*
+.envrc
