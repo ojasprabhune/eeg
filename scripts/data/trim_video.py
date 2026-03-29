@@ -5,11 +5,12 @@ import numpy as np
 from eeg.eeg_data.datasets.utils import Colors
 
 parser = argparse.ArgumentParser(
-    prog="Trim EEG and hand position data",
-    description="Trim EEG and hand position data to specific times",
+    prog="Trim data",
+    description="Trim EEG, hand position data, and labels to specific times",
 )
 parser.add_argument("eeg_data_path", type=str)
 parser.add_argument("hand_data_path", type=str)
+parser.add_argument("labels_path", type=str)
 parser.add_argument("eeg_trim_start_seconds", type=float)
 parser.add_argument("hand_trim_start_seconds", type=float)
 parser.add_argument("start_offset_seconds", type=float)
@@ -18,9 +19,10 @@ args = parser.parse_args()
 
 eeg_data_path: str = args.eeg_data_path
 hand_data_path: str = args.hand_data_path
+labels_path: str = args.labels_path
 fps = 29.973234
 
-if eeg_data_path.endswith(".edf") or hand_data_path.endswith(".npy"):
+if eeg_data_path.endswith(".edf") or hand_data_path.endswith(".npy") or labels_path.endswith(".npy"):
     print(f"{Colors.FAIL}Error: Paths should not include file extensions.{Colors.ENDC}")
     quit()
 
@@ -28,6 +30,7 @@ if eeg_data_path.endswith(".edf") or hand_data_path.endswith(".npy"):
 def trim_recording(
     eeg_data_path: str,
     hand_data_path: str,
+    labels_path: str,
     eeg_trim_start_seconds: float,
     hand_trim_start_seconds: float,
     start_offset_seconds: float,
@@ -49,11 +52,20 @@ def trim_recording(
     hand_trimmed = hand_data[:, start_frame:, :]
     print(f"{Colors.OKCYAN}Trimmed NPY.{Colors.ENDC}\n")
 
+    # --- labels ---
+    print(f"{Colors.OKCYAN}Reading labels...{Colors.ENDC}")
+    labels = np.load(f"{labels_path}.npy")
+    start_frame = int((hand_trim_start_seconds + start_offset_seconds) * fps)
+    labels_trimmed = labels[start_frame:]
+    print(f"{Colors.OKCYAN}Trimmed labels.{Colors.ENDC}\n")
+
     initial_eeg_length = raw.duration
     initial_hand_length = hand_data.shape[1] / fps
+    initial_labels_length = hand_data.shape[0] / fps
 
     eeg_length = raw_trimmed.duration
     hand_length = hand_trimmed.shape[1] / fps
+    labels_length = labels_trimmed.shape[0] / fps
 
     # --- trim to same length ---
     print(f"{Colors.OKGREEN}Trimming data ends...{Colors.ENDC}\n")
@@ -61,18 +73,28 @@ def trim_recording(
     raw_trimmed.crop(tmin=0, tmax=min_length)
     n_frames = int(min_length * fps)
     hand_trimmed = hand_trimmed[:, :n_frames, :]
+    labels_trimmed = labels_trimmed[:n_frames]
 
     raw_trimmed.save(f"{eeg_data_path}_cut_raw.fif", overwrite=True)
     print(f"{Colors.OKBLUE}Saved EDF.{Colors.ENDC}\n")
     np.save(f"{hand_data_path}_cut.npy", hand_trimmed)
     print(f"{Colors.OKCYAN}Saved NPY.{Colors.ENDC}\n")
+    np.save(f"{labels_path}_cut.npy", labels_trimmed)
+    print(f"{Colors.OKCYAN}Saved labels.{Colors.ENDC}\n")
 
     # --- stats ---
     final_eeg_length = raw_trimmed.duration
     final_hand_length = hand_trimmed.shape[1] / fps
+    final_labels_length = labels_trimmed.shape[0] / fps
 
     print(f"EEG data shape: {Colors.BOLD}{raw.get_data().shape}{Colors.ENDC}")
-    print(f"Hand data shape: {Colors.BOLD}{hand_data.shape}{Colors.ENDC}\n")
+    print(f"Hand data shape: {Colors.BOLD}{hand_data.shape}{Colors.ENDC}")
+    print(f"Labels shape: {Colors.BOLD}{labels.shape}{Colors.ENDC}\n")
+
+    print(f"Trimmd EEG data shape: {Colors.BOLD}{raw_trimmed.get_data().shape}{Colors.ENDC}")
+    print(f"Trimmed hand data shape: {Colors.BOLD}{hand_trimmed.shape}{Colors.ENDC}")
+    print(f"Trimmed labels shape: {Colors.BOLD}{labels_trimmed.shape}{Colors.ENDC}\n")
+
 
     print(
         f"{Colors.OKCYAN}EEG data length before: {round(initial_eeg_length, 1)} seconds.{Colors.ENDC}"
@@ -95,6 +117,7 @@ def trim_recording(
 trim_recording(
     eeg_data_path,
     hand_data_path,
+    labels_path,
     eeg_trim_start_seconds=args.eeg_trim_start_seconds,
     hand_trim_start_seconds=args.hand_trim_start_seconds,
     start_offset_seconds=args.start_offset_seconds,
