@@ -35,7 +35,7 @@ width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 
 # initialize labels
 labels = np.ones(total_frames)
-current_label = 1
+current_label = 4
 frame_idx = 0
 
 # --- PLAYBACK LOOP ---
@@ -77,7 +77,7 @@ while cap.isOpened():
     labels[frame_idx] = current_label
     frame_idx += 1
 
-    delay = int(20 / speed)
+    delay = int(35 / speed)
 
     # keyboard input
     key = cv2.waitKey(delay) & 0xFF
