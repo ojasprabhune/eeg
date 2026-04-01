@@ -12,7 +12,6 @@ from eeg.data_collection import JointData
 
 from .utils import Colors, appendages
 
-
 def compute_bandpower_features(
     eeg_128hz: np.ndarray,
     sfreq: float = 128.0,
@@ -50,7 +49,7 @@ def compute_bandpower_features(
     }
 
     freqs = np.fft.rfftfreq(nperseg, d=1.0 / sfreq)
-    print(f"Number of frequencies: {freqs.shape}.")
+    print(f"Number of frequencies: {freqs.shape}")
     band_masks = {
         name: np.logical_and(freqs >= flo, freqs <= fhi)
         for name, (flo, fhi) in bands.items()
@@ -180,7 +179,7 @@ class TemporalDataset(Dataset):
         ).astype(np.float32)
 
         print(
-            f"{Colors.OKGREEN}Bandpower features shape: {self.bandpower_features.shape} (T, 84){Colors.ENDC}"
+            f"{Colors.OKGREEN}Bandpower features shape: {self.bandpower_features.shape} - (T, 84){Colors.ENDC}"
         )
 
         # --- 30 Hz branch: raw EEG (existing behavior) ---
@@ -195,11 +194,20 @@ class TemporalDataset(Dataset):
 
         print(f"{Colors.OKGREEN}Filtered & processed EEG data.{Colors.ENDC}")
 
+        # --- labels ---
+        
+        print(f"{Colors.OKBLUE}Getting labels...{Colors.ENDC}")
+        self.label_files = []
+        for path in sorted(Path(f"{hand_data_path}").rglob("*labels_cut.npy")):
+            self.label_files.append(np.load(path))
+
+        self.labels = np.concatenate(self.label_files, axis=0)  # along time dim
+
         # --- appendages + regions ---
 
         print(f"{Colors.OKBLUE}Getting appendage data...{Colors.ENDC}")
         self.hands = []
-        for path in sorted(Path(f"{hand_data_path}").rglob("*_cut.npy")):
+        for path in sorted(Path(f"{hand_data_path}").rglob("*hands_cut.npy")):
             self.hands.append(np.load(path))
 
         self.raw_app_data = np.concatenate(self.hands, axis=1)  # along time dim
