@@ -19,7 +19,7 @@ nodes:
 
   - id: hand_controller
     build: cargo build -p AHControl
-    path: target/debug/AHControl #--serialport /dev/ttyACM0 --config AHControl/config/r_hand.toml
-    args: --serialport COM13 --config AHControl/config/r_hand.toml
+    path: target/debug/AHControl
+    args: --serialport /dev/ttyAMC0 --config AHControl/config/r_hand.toml
     inputs:
       mj_r_joints_pos: hand_simulation/mj_r_joints_pos
