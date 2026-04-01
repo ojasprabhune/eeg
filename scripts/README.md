@@ -1,61 +1,40 @@
-# Scripts
+# Core training and utility scripts
 
-This directory contains training scripts and utilities for the EEG and hand pose estimation pipeline.
+This directory contains the primary training scripts for the EEG-to-Hand pipeline, including VQ-VAE for hand pose quantization and various LLM/Transformer architectures for sequence modeling.
 
 ## Directory Structure
 
 ### `data/`
+Utilities for data collection (MediaPipe), manual labeling, synchronization (trimming), and dataset preparation.
+See [data/README.md](data/README.md) for more details.
 
-Data collection and preprocessing utilities for hand pose estimation.
+### `bionic_hand/`
+Integration and control code for the Pollen Robotics AmazingHand. Includes configurations for simulation (MuJoCo) and real hardware.
+See [bionic_hand/Demo/README.md](bionic_hand/Demo/README.md) for more details.
 
-#### `collect_data.py`
+---
 
-Collects hand pose estimation data for XYZ position coordinates for 21 joints on a hand. Data is stored in an .npy file with T (number of frames) rows and 63 columns (channels).
+## Training Scripts
 
-#### `save_data.py`
+### `train_vqvae.py`
+Trains a Vector Quantized Variational Autoencoder (VQ-VAE) to compress 12-dimensional hand appendage vectors into discrete latent representations (tokens). This allows the downstream LLM to operate on a discrete vocabulary rather than continuous values.
 
-Saves processed hand pose estimation data.
-
-#### `trim_video.py`
-
-Utility for trimming video files.
-
-#### `train_kmeans_appendage.py`
-
-Trains K-means clustering model on appendage (finger/hand) data for tokenization.
+#### Usage
+```bash
+python scripts/train_vqvae.py <checkpoint_name>
+```
 
 ---
 
 ### `train_big_eeg_llm.py`
-
-Trains a large EEG language model end-to-end. This is a main training script for the EEG LLM pipeline.
-
-The EEG LLM is a sequence-to-sequence model, regressing EEG data to appendage values for applying to kinematic hand movements.
+A main training script for the sequence-to-sequence model that regresses EEG signals directly to hand appendage tokens and durations. It incorporates pre-trained LaBraM backbones and the VQ-VAE tokenizer.
 
 ---
 
-### `train_e2e.py`
-
-Trains a large hand position language model end-to-end. This is a main training script for the Position LLM pipeline.
-
-It consists of an autoregressive transformer decoder and uses appendage values and VQ-VAE tokens.
+### `train_temporal_model.py`
+A utility script for initializing and testing the `TemporalDataset` from the `gesture2hand` module, which prepares bandpower features from raw EEG for temporal classification.
 
 ---
 
-### `train_vqvae.py`
-
-Trains a Vector Quantized Variational Autoencoder (VQ-VAE) for learning discrete latent representations of 12 appendage values.
-
----
-
-### `bionic_hand/`
-
-Integration and control code for the bionic hand hardware and simulation.
-
-#### `Demo/`
-
-Demonstration and simulation configurations for the bionic hand.
-
-**Key Files:**
-- `dataflow_*.yml` - Dataflow configuration files for different modes (simulation, real hardware, tracking)
-- `README.md` - Bionic hand demo documentation
+### `train_e2e.py` (Legacy/Reference)
+An end-to-end training script for the autoregressive Position LLM, used for validating the discrete tokenization and next-position prediction pipeline.
