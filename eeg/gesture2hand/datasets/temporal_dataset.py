@@ -50,7 +50,7 @@ def compute_bandpower_features(
     }
 
     freqs = np.fft.rfftfreq(nperseg, d=1.0 / sfreq)
-    print(freqs.shape)
+    print(f"Number of frequencies: {freqs.shape}.")
     band_masks = {
         name: np.logical_and(freqs >= flo, freqs <= fhi)
         for name, (flo, fhi) in bands.items()
@@ -118,14 +118,24 @@ class TemporalDataset(Dataset):
         print(f"{Colors.OKBLUE}Getting EEG data...{Colors.ENDC}")
         self.raws = []
         for path in sorted(Path(f"{eeg_data_path}").rglob("*_cut_raw.fif")):
-            self.raws.append(mne.io.read_raw_fif(path))
+            raw = mne.io.read_raw_fif(path, verbose=False)
+            # some edf+ files have 4 fewer channels
+            if raw.info['nchan'] == 71:
+                extra_channels = [
+                    "OrTimestampS",
+                    "OrTimestampMs",
+                    "MOT.OrTimestampS",
+                    "MOT.OrTimestampM"
+                ]
+                raw.drop_channels(extra_channels)
+            self.raws.append(raw)
 
         # - filtering -
-        self.raw: mne.io.Raw = mne.concatenate_raws(self.raws, preload=True)
-        self.filtered = self.raw.copy().filter(l_freq=0.1, h_freq=50)
-        self.filtered = self.filtered.notch_filter(freqs=60)
+        self.raw: mne.io.Raw = mne.concatenate_raws(self.raws, preload=True, verbose=False)
+        self.filtered = self.raw.copy().filter(l_freq=0.1, h_freq=50, verbose=False)
+        self.filtered = self.filtered.notch_filter(freqs=60, verbose=False)
         self.filtered.set_eeg_reference(
-            "average", projection=False
+            "average", projection=False, verbose=False
         )  # common average reference
 
         # - pick channels before branching -
@@ -145,7 +155,7 @@ class TemporalDataset(Dataset):
             "F8",
             "AF4",
         ]
-        self.filtered.pick(self.eeg_channels)
+        self.filtered.pick(self.eeg_channels, verbose=False)
 
         # --- 128 Hz branch: bandpower features ---
         # keep a copy at native rate BEFORE resampling
@@ -177,9 +187,9 @@ class TemporalDataset(Dataset):
 
         filtered_30 = self.filtered.copy()
         filtered_30.filter(
-            8, 30, method="iir", iir_params=dict(order=4, ftype="butter")
+            8, 30, method="iir", iir_params=dict(order=4, ftype="butter"), verbose=False
         )
-        filtered_30.resample(sfreq=29.973234)
+        filtered_30.resample(sfreq=29.973234, verbose=False)
 
         self.eeg_data: np.ndarray = filtered_30.get_data().T  # (T_30, 14)
 
