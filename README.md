@@ -12,8 +12,7 @@ cd eeg
 ```
 
 ### 2. Download Models
-Download the required EEG and position prediction models from the following link and place them in the `models/` directory:
-[Download Models (Placeholder Link)](#)
+Download the required EEG and position prediction models from [this placeholder link](models/) and place them in the `models/` directory.
 
 ### 3. Setup Environment
 We use `uv` for fast dependency management. Sync the environment and install the package in editable mode:
