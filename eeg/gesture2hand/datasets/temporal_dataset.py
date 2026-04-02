@@ -179,7 +179,7 @@ class TemporalDataset(Dataset):
         ).astype(np.float32)
 
         print(
-            f"{Colors.OKGREEN}Bandpower features shape: {self.bandpower_features.shape} - (T, 84){Colors.ENDC}"
+            f"{Colors.OKGREEN}Bandpower features shape: {self.bandpower_features.shape} or (T, 84){Colors.ENDC}"
         )
 
         # --- 30 Hz branch: raw EEG (existing behavior) ---
@@ -218,13 +218,14 @@ class TemporalDataset(Dataset):
         print(f"{Colors.OKGREEN}Retrieved appendage data.{Colors.ENDC}")
         print(f"{Colors.OKGREEN}Successful retrieved all data.{Colors.ENDC}")
 
-        # ─── align bandpower features with hand data ──────────────────────
+        # --- align bandpower features with hand data ---
         min_len = min(
             len(self.bandpower_features), len(self.app_data), len(self.eeg_data)
         )
         self.bandpower_features = self.bandpower_features[:min_len]
         self.app_data = self.app_data[:min_len]
         self.eeg_data = self.eeg_data[:min_len]
+        self.labels = self.labels[:min_len]
 
         # - vq-vae pre-computing -
         print(f"{Colors.OKBLUE}Pre-computing VQ-VAE tokens...{Colors.ENDC}")
@@ -241,49 +242,58 @@ class TemporalDataset(Dataset):
         self.vqvae_tokens_all = np.concatenate(self.vqvae_tokens_all)
 
         if print_shapes:
+            print(Colors.HEADER)
             print("EEG shape (30Hz):   ", self.eeg_data.shape)
             print("Bandpower shape:    ", self.bandpower_features.shape)
-            print("app shape:          ", self.app_data.shape)
+            print("Appendages shape:   ", self.app_data.shape)
             print("VQ-VAE tokens shape:", self.vqvae_tokens_all.shape)
+            print("Labels shape:       ", self.labels.shape)
+            print(Colors.ENDC)
 
         # --- sequences ---
         self.eeg_chunks = []
         self.app_chunks = []
         self.token_chunks = []
         self.bp_chunks = []
+        self.label_chunks = []
 
         for i in range(0, min_len - seq_len + 1, stride):
             eeg_chunk = self.eeg_data[i : i + seq_len, :]  # (seq_len, 14)
+            bp_chunk = self.bandpower_features[i : i + seq_len, :]  # (seq_len, 84)
             app_chunk = self.app_data[i : i + seq_len, :]  # (seq_len, 12)
             token_chunk = self.vqvae_tokens_all[i : i + seq_len]  # (seq_len,)
-            bp_chunk = self.bandpower_features[i : i + seq_len, :]  # (seq_len, 84)
+            label_chunk = self.labels[i : i + seq_len]
 
             self.eeg_chunks.append(eeg_chunk)
+            self.bp_chunks.append(bp_chunk)
             self.app_chunks.append(app_chunk)
             self.token_chunks.append(token_chunk)
-            self.bp_chunks.append(bp_chunk)
+            self.label_chunks.append(label_chunk)
 
         # --- train-val split ---
 
         self.split_idx = int(len(self.eeg_chunks) * 0.8)
 
         self.eeg_chunks = np.array(self.eeg_chunks, dtype=np.float32)
+        self.bp_chunks = np.array(self.bp_chunks, dtype=np.float32)
         self.app_chunks = np.array(self.app_chunks, dtype=np.float32)
         self.token_chunks = np.array(self.token_chunks, dtype=np.int64)
-        self.bp_chunks = np.array(self.bp_chunks, dtype=np.float32)
+        self.label_chunks = np.array(self.label_chunks, dtype=np.int64)
 
         self.train_eeg_chunks = self.eeg_chunks[: self.split_idx, :, :]
+        self.train_bp_chunks = self.bp_chunks[: self.split_idx, :, :]
         self.train_app_chunks = self.app_chunks[: self.split_idx, :, :]
         self.train_token_chunks = self.token_chunks[: self.split_idx]
-        self.train_bp_chunks = self.bp_chunks[: self.split_idx, :, :]
+        self.train_label_chunks = self.label_chunks[: self.split_idx]
 
         self.val_eeg_chunks = self.eeg_chunks[self.split_idx :, :, :]
+        self.val_bp_chunks = self.bp_chunks[self.split_idx :, :, :]
         self.val_app_chunks = self.app_chunks[self.split_idx :, :, :]
         self.val_token_chunks = self.token_chunks[self.split_idx :]
-        self.val_bp_chunks = self.bp_chunks[self.split_idx :, :, :]
+        self.val_label_chunks = self.label_chunks[self.split_idx :]
 
         if print_shapes:
-            print(f"{Colors.WARNING}total # of chunks: {self.__len__()}{Colors.ENDC}")
+            print(f"{Colors.WARNING}Total number of chunks: {self.__len__()}{Colors.ENDC}")
 
     def __len__(self) -> int:
         return len(self.train_eeg_chunks)
@@ -297,16 +307,18 @@ class TemporalDataset(Dataset):
         torch.Tensor,
         torch.Tensor,
         torch.Tensor,
+        torch.Tensor
     ]:
         """
-        Returns EEG, bandpower, appendage data, VQ-VAE tokens, durations, masks
-        for the given index from the training set.
+        Returns EEG, bandpower, appendage data, VQ-VAE tokens, labels, durations, and
+        masks for the given index from the training set.
         """
 
         eeg = self.train_eeg_chunks[index]
         bp = self.train_bp_chunks[index]
         apps = self.train_app_chunks[index]
         tokens = self.train_token_chunks[index]
+        labels = self.train_label_chunks[index]
 
         # vqvae_tokens: (T,)
         reversed_tokens = tokens[::-1]
@@ -337,15 +349,16 @@ class TemporalDataset(Dataset):
             torch.tensor(bp),
             torch.tensor(apps),
             torch.tensor(tokens),
+            torch.tensor(labels),
             torch.tensor(durations),
             torch.tensor(masks),
         )
 
     def get_val_data(
         self, index: int
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
-        Returns EEG, bandpower, appendage data, and VQ-VAE tokens
+        Returns EEG, bandpower, appendage data, VQ-VAE tokens, and labels
         for the given index from the validation set.
         """
 
@@ -353,10 +366,12 @@ class TemporalDataset(Dataset):
         bp = self.val_bp_chunks[index]
         apps = self.val_app_chunks[index]
         tokens = self.val_token_chunks[index]
+        labels = self.val_label_chunks[index]
 
         return (
             torch.tensor(eeg),
             torch.tensor(bp),
             torch.tensor(apps),
             torch.tensor(tokens),
+            torch.tensor(labels),
         )
