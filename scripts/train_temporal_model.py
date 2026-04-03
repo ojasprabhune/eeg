@@ -3,18 +3,25 @@
 
 import yaml
 import math
+import wandb
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.utils.data import TensorDataset, WeightedRandomSampler
+from torch.utils.data import DataLoader, TensorDataset, WeightedRandomSampler
 
-from eeg.gesture2hand.datasets import TemporalDataset
+from eeg.gesture2hand import TemporalDataset, TemporalModel
 
 with open("config/temporal.yaml", "r") as config_file:
     config = yaml.safe_load(config_file)
 
     stride = config["stride"]
     val_ratio = config["val_ratio"]
+    num_features = config["num_features"]
+    d_model = config["d_model"]
+    num_heads = config["num_heads"]
+    num_layers = config["num_layers"]
+    dropout = config["dropout"]
+    vocab_size = config["vocab_size"]
 
     device = config["device"]
     batch_size = config["batch_size"]
@@ -28,6 +35,17 @@ with open("config/temporal.yaml", "r") as config_file:
     save_ckpt_path = config["save_ckpt_path"]
     save_every = config["save_every"]
 
+dataset = TemporalDataset(
+    seq_len=sequence_length,
+    stride=stride,
+    device=device,
+)
+
+all_bp_chunks = dataset.bp_chunks       # (N, seq_len, 84)
+label_chunks = dataset.label_chunks     # (N, seq_len)
+
+n_chunks = len(all_bp_chunks)
+
 # --- block-stratified random split ---
 
 chunks_per_block = max(1, sequence_length // stride)
@@ -36,7 +54,7 @@ n_blocks = n_chunks // chunks_per_block
 block_labels = np.array(
     [
         int(
-            label_chunks[b * chunks_per_block : (b + 1) * chunks_per_block].mean() > 0.5
+            np.mean(label_chunks[b * chunks_per_block : (b + 1) * chunks_per_block]) > 0.5
         )
         for b in range(n_blocks)
     ]
@@ -108,16 +126,17 @@ val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False)
 
 # --- model ---
 
-model = EEGTemporalModel(
+model = TemporalModel(
     num_features=num_features,
     d_model=d_model,
     num_heads=num_heads,
     num_layers=num_layers,
     dropout=dropout,
+    vocab_size=vocab_size
 ).to(device)
 
 param_count = sum(p.numel() for p in model.parameters() if p.requires_grad)
-print(f"Model: {model_type}, parameters: {param_count:,}")
+print(f"Number of model parameters: {param_count:,}")
 wandb.log({"param_count": param_count})
 
 # --- optimizer ---

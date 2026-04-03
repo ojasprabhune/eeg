@@ -2,6 +2,12 @@
 
 stride: 15
 val_ratio: 0.2
+num_features: 84
+d_model: 64
+num_heads: 4
+num_layers: 2
+dropout: 0.3
+vocab_size: 4
 
 # training
 

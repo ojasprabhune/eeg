@@ -38,9 +38,10 @@ def compute_bandpower_features(
         14 channels × 6 features (theta, mu, beta, low_gamma, mu/beta, total).
     """
     T, C = eeg_128hz.shape
-    nperseg = int(window_sec * sfreq)
-    half_win = nperseg // 2
+    nperseg = int(window_sec * sfreq) # number of samples in a window
+    half_win = nperseg // 2 # number of samples in half a window
 
+    # frequency bands of interest
     bands = {
         "theta": (4, 8),
         "mu": (8, 13),
@@ -48,26 +49,74 @@ def compute_bandpower_features(
         "low_gamma": (30, 50),
     }
 
+    # pre-compute frequency masks for FFT bins of shape (nperseg//2 + 1,)
     freqs = np.fft.rfftfreq(nperseg, d=1.0 / sfreq)
     print(f"Number of frequencies: {freqs.shape}")
+
+    # dictionary of boolean masks that says True for those frequencies that fall
+    # into a band. the mask for each band has shape (nperseg//2 + 1,) and can be
+    # applied to the FFT output
     band_masks = {
         name: np.logical_and(freqs >= flo, freqs <= fhi)
         for name, (flo, fhi) in bands.items()
     }
 
+    # fades edges to zero to reduce spectral leakage. it contains the values of
+    # a Hanning window of length nperseg, which is a smooth curve that starts
+    # and ends at zero and peaks at 1 in the middle. by multiplying each
+    # windowed segment of EEG data by this Hanning window, we ensure that the
+    # edges of the segment are weighted less in the FFT, which helps to minimize
+    # artifacts in the frequency domain caused by abrupt changes at the segment
+    # boundaries
     hann = np.hanning(nperseg)[:, None]  # (nperseg, 1)
-    centers = np.arange(half_win, T - half_win, step_samples_128)
-    n_out = len(centers)
-    features = np.zeros((n_out, C * 6), dtype=np.float32)
 
+    # np.arange goes from number of samples in half a window to T minus that
+    # number, stepping by a step size. the physical meaning of this is that we
+    # are centering a window around each point in time where we have enough
+    # samples on either side to fill the window, and we are moving this center
+    # point by a certain step size to get the next window. the output will be a
+    # sequence of bandpower features that are aligned with the original EEG time
+    # series, but at a lower temporal resolution
+    centers = np.arange(half_win, T - half_win, step_samples_128)
+
+    # number of output time points after windowing
+    n_out = len(centers)
+
+    # np.zeros to create an array to hold the bandpower features, with shape
+    # (n_out, C * 6) where C is the number of channels and 6 is the number of
+    # features per channel
+    features = np.zeros((n_out, C * 6), dtype=np.float32) # (T_out, 84)
+
+    # index and actual time of the center of each window
     for i, t in enumerate(centers):
-        segment = eeg_128hz[t - half_win : t + half_win, :] * hann
-        fft_vals = np.fft.rfft(segment, axis=0)
+
+        # extract a segment of EEG data centered around time t with length equal
+        # to the window size. this segment will be used to compute the FFT and
+        # bandpower features for that time point. by multiplying the segment by
+        # the Hanning window, we are applying a smooth taper to the data, which
+        # helps to reduce spectral leakage in the FFT. the resulting segment has
+        # shape (nperseg, C) where nperseg is the number of samples in the
+        # window and C is the number of channels
+        segment = eeg_128hz[t - half_win : t + half_win, :] * hann # (nperseg, C)
+
+        # compute the FFT of the windowed segment along the time axis (axis=0).
+        fft_vals = np.fft.rfft(segment, axis=0) # (nperseg//2 + 1, C)
+
+        # compute the power spectral density (PSD) from the FFT values. the PSD
+        # is a measure of the power of the signal at different frequencies, and
+        # it is computed by taking the squared magnitude of the FFT values and
+        # normalizing by the number of samples in the window. the resulting PSD
+        # has shape (nperseg//2 + 1, C) and contains the power of the signal at
+        # each frequency bin for each channel
         psd = (np.abs(fft_vals) ** 2) / nperseg
 
         for ch in range(C):
+            # base is a multiple of 6 that determines where the features for
+            # this channel will be stored in the output array
             base = ch * 6
+
             bp = {}
+            
             for j, (name, mask) in enumerate(band_masks.items()):
                 bp[name] = psd[mask, ch].sum()
                 features[i, base + j] = bp[name]
