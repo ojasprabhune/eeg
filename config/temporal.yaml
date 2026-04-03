@@ -1,0 +1,19 @@
+# temporal model
+
+stride: 15
+val_ratio: 0.2
+
+# training
+
+device: cpu
+batch_size: 32
+seq_length: 60
+warmup_steps: 4000
+base_lr: 5e-5
+epochs: 5000
+
+run_name: eeg_lstm
+# use_ckpt_path: /var/log/thavamount/eeg_ckpts/eeg_lm/eeg_llm.pth
+use_ckpt_path: None
+save_ckpt_path: /var/log/thavamount/eeg_ckpts/eeg_lm/lstm/eeg_lstm
+save_every: 50

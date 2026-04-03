@@ -130,7 +130,9 @@ class TemporalDataset(Dataset):
             self.raws.append(raw)
 
         # - filtering -
-        self.raw: mne.io.Raw = mne.concatenate_raws(self.raws, preload=True, verbose=False)
+        self.raw = mne.concatenate_raws(self.raws, preload=True, verbose=False)
+        if isinstance(self.raw, tuple):
+            self.raw = self.raw[0]
         self.filtered = self.raw.copy().filter(l_freq=0.1, h_freq=50, verbose=False)
         self.filtered = self.filtered.notch_filter(freqs=60, verbose=False)
         self.filtered.set_eeg_reference(

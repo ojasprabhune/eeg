@@ -5,7 +5,7 @@ This module focuses on modeling high-fidelity hand movements independently of EE
 ## Subdirectories
 
 ### [position_llm/](position_llm/)
-The core implementation of the hand position language model.
+The core implementation of the hand position language model. This model generally knows how hands move and behave.
 - `position_llm.py`: An autoregressive Transformer decoder that predicts sequences of discrete hand position tokens. It optionally supports duration prediction for each token.
 - `e2e_position_llm.py`: An end-to-end model that combines the Position LLM with a regression head to reconstruct continuous appendage values.
 - `tokenizer.py`: Implements `RegionTokenizer` (using K-Means) and `DeltaTokenizer` (using fixed binning) to convert continuous movement into discrete tokens.
