@@ -111,19 +111,40 @@ def compute_bandpower_features(
         psd = (np.abs(fft_vals) ** 2) / nperseg
 
         for ch in range(C):
-            # base is a multiple of 6 that determines where the features for
-            # this channel will be stored in the output array
+            # start position for this channel's features in the output array
             base = ch * 6
 
             bp = {}
             
+            # j is the index, and (name, mask) is the tuple of band name and its
+            # corresponding frequency mask.
             for j, (name, mask) in enumerate(band_masks.items()):
+
+                # psd has shape (nperseg//2 + 1, C) or (num_freq_bins, C). mask
+                # selects only frequences inside a band (e.g., 8-13 Hz for mu).
+                # psd[mask, ch] -> power values for that band for this channel.
+                # .sum() -> total power in that frequency band. this is stored
+                # in bp[name] (e.g., bp["mu"] = bandpower). bandpower is type
+                # float and is just a single number representing the total power
+                # in that frequency band
                 bp[name] = psd[mask, ch].sum()
+
+                # i is time window index, and base + j is which band (0=theta,
+                # 1=mu, etc.) this stores the computed bandpower into the
+                # output feature vector, effectively building: [theta, mu, beta,
+                # low_gamma, ...] per channel]
                 features[i, base + j] = bp[name]
+
+            # compute mu-to-beta ratio, which is a common EEG feature for motor
+            # activity and engagement. 1e-10 prevents division by zero, and
+            # this is stored as the 5th feature for this channel
             features[i, base + 4] = bp["mu"] / (bp["beta"] + 1e-10)
+
+            # sum all bandpowers -> total signal power across all bands. it
+            # acts as a normalization reference or overall energy measure
             features[i, base + 5] = sum(bp.values()) + 1e-10
 
-    return features
+    return features # (T, 84)
 
 
 class TemporalDataset(Dataset):
