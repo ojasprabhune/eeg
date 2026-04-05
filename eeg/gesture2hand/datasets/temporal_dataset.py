@@ -12,6 +12,7 @@ from eeg.data_collection import JointData
 
 from .utils import Colors, appendages
 
+
 def compute_bandpower_features(
     eeg_128hz: np.ndarray,
     sfreq: float = 128.0,
@@ -157,6 +158,7 @@ class TemporalDataset(Dataset):
         seq_len: int = 60,
         stride: int = 15,
         device: str = "cpu",
+        val_ratio: float = 0.2,
         print_shapes: bool = False,
     ) -> None:
         """
@@ -166,12 +168,13 @@ class TemporalDataset(Dataset):
 
         print(f"{Colors.HEADER}{Colors.BOLD}Initializing dataset...{Colors.ENDC}")
         self.print_shapes = print_shapes
-        self.device = device
+        self.seq_len = seq_len
         self.stride = stride
+        self.device = device
 
         super().__init__()
 
-        # --- vqvae ---
+        # --- vqvae -----------------------------------------------------------
 
         print(f"{Colors.OKBLUE}Getting VQVAE model...{Colors.ENDC}")
         self.vqvae = VQVAE(input_dim=12, codebook_size=512, embedding_dim=1024)
@@ -182,7 +185,7 @@ class TemporalDataset(Dataset):
 
         self.region_tokenizer = RegionTokenizer(region_tokenizer_path)
 
-        # --- EEG ---
+        # --- EEG -------------------------------------------------------------
 
         print(f"{Colors.OKBLUE}Getting EEG data...{Colors.ENDC}")
         self.raws = []
@@ -198,6 +201,7 @@ class TemporalDataset(Dataset):
                 ]
                 raw.drop_channels(extra_channels)
             self.raws.append(raw)
+            break # TODO remove this to load all data
 
         # - filtering -
         self.raw = mne.concatenate_raws(self.raws, preload=True, verbose=False)
@@ -228,7 +232,7 @@ class TemporalDataset(Dataset):
         ]
         self.filtered.pick(self.eeg_channels, verbose=False)
 
-        # --- 128 Hz branch: bandpower features ---
+        # --- 128 Hz branch: bandpower features -------------------------------
         # keep a copy at native rate BEFORE resampling
 
         self.sfreq_native = self.filtered.info["sfreq"]  # should be 128
@@ -254,7 +258,7 @@ class TemporalDataset(Dataset):
             f"{Colors.OKGREEN}Bandpower features shape: {self.bandpower_features.shape} or (T, 84){Colors.ENDC}"
         )
 
-        # --- 30 Hz branch: raw EEG (existing behavior) ---
+        # --- 30 Hz branch: raw EEG filtering ---------------------------------
 
         filtered_30 = self.filtered.copy()
         filtered_30.filter(
@@ -266,7 +270,7 @@ class TemporalDataset(Dataset):
 
         print(f"{Colors.OKGREEN}Filtered & processed EEG data.{Colors.ENDC}")
 
-        # --- labels ---
+        # --- labels ----------------------------------------------------------
         
         print(f"{Colors.OKBLUE}Getting labels...{Colors.ENDC}")
         self.label_files = []
@@ -275,12 +279,13 @@ class TemporalDataset(Dataset):
 
         self.labels = np.concatenate(self.label_files, axis=0)  # along time dim
 
-        # --- appendages + regions ---
+        # --- appendages + regions --------------------------------------------
 
         print(f"{Colors.OKBLUE}Getting appendage data...{Colors.ENDC}")
         self.hands = []
         for path in sorted(Path(f"{hand_data_path}").rglob("*hands_cut.npy")):
             self.hands.append(np.load(path))
+            break # TODO remove this to load all data
 
         self.raw_app_data = np.concatenate(self.hands, axis=1)  # along time dim
         self.data_joints = JointData(self.raw_app_data)
@@ -290,7 +295,8 @@ class TemporalDataset(Dataset):
         print(f"{Colors.OKGREEN}Retrieved appendage data.{Colors.ENDC}")
         print(f"{Colors.OKGREEN}Successful retrieved all data.{Colors.ENDC}")
 
-        # --- align bandpower features with hand data ---
+        # --- align bandpower features with hand data -------------------------
+
         min_len = min(
             len(self.bandpower_features), len(self.app_data), len(self.eeg_data)
         )
@@ -322,13 +328,22 @@ class TemporalDataset(Dataset):
             print("Labels shape:       ", self.labels.shape)
             print(Colors.ENDC)
 
-        # --- sequences ---
+        # --- sequences -------------------------------------------------------
+
         self.eeg_chunks = []
         self.app_chunks = []
         self.token_chunks = []
         self.bp_chunks = []
         self.label_chunks = []
 
+        # we iterate over the data in steps of stride, creating chunks of length
+        # seq_len. for each chunk, we extract the corresponding segments of
+        # eeg_data, bandpower_features, app_data, vqvae_tokens_all, and labels,
+        # and store them in lists. this way we create overlapping sequences of
+        # data that can be used for training a temporal model. the resulting
+        # chunks will have shape (num_chunks, seq_len, feature_dim) for eeg,
+        # bandpower, and appendage data, and (num_chunks, seq_len) for tokens
+        # and labels
         for i in range(0, min_len - seq_len + 1, stride):
             eeg_chunk = self.eeg_data[i : i + seq_len, :]  # (seq_len, 14)
             bp_chunk = self.bandpower_features[i : i + seq_len, :]  # (seq_len, 84)
@@ -342,9 +357,11 @@ class TemporalDataset(Dataset):
             self.token_chunks.append(token_chunk)
             self.label_chunks.append(label_chunk)
 
-        # --- train-val split ---
+        # --- train-val split -------------------------------------------------
 
-        self.split_idx = int(len(self.eeg_chunks) * 0.8)
+        # these chunks are of shape (num_chunks, seq_len, feature_dim) for eeg,
+        # bandpower, and appendage data, and (num_chunks, seq_len) for tokens
+        # and labels
 
         self.eeg_chunks = np.array(self.eeg_chunks, dtype=np.float32)
         self.bp_chunks = np.array(self.bp_chunks, dtype=np.float32)
@@ -352,23 +369,29 @@ class TemporalDataset(Dataset):
         self.token_chunks = np.array(self.token_chunks, dtype=np.int64)
         self.label_chunks = np.array(self.label_chunks, dtype=np.int64)
 
-        self.train_eeg_chunks = self.eeg_chunks[: self.split_idx, :, :]
-        self.train_bp_chunks = self.bp_chunks[: self.split_idx, :, :]
-        self.train_app_chunks = self.app_chunks[: self.split_idx, :, :]
-        self.train_token_chunks = self.token_chunks[: self.split_idx]
-        self.train_label_chunks = self.label_chunks[: self.split_idx]
+        self.train_idx, self.val_idx = self._create_splits(val_ratio)
 
-        self.val_eeg_chunks = self.eeg_chunks[self.split_idx :, :, :]
-        self.val_bp_chunks = self.bp_chunks[self.split_idx :, :, :]
-        self.val_app_chunks = self.app_chunks[self.split_idx :, :, :]
-        self.val_token_chunks = self.token_chunks[self.split_idx :]
-        self.val_label_chunks = self.label_chunks[self.split_idx :]
+        self.train_eeg = self.eeg_chunks[self.train_idx]
+        self.train_bp = self.bp_chunks[self.train_idx]
+        self.train_app = self.app_chunks[self.train_idx]
+        self.train_token = self.token_chunks[self.train_idx]
+        self.train_label = self.label_chunks[self.train_idx]
+
+        self.val_eeg = self.eeg_chunks[self.val_idx]
+        self.val_bp = self.bp_chunks[self.val_idx]
+        self.val_app = self.app_chunks[self.val_idx]
+        self.val_token = self.token_chunks[self.val_idx]
+        self.val_label = self.label_chunks[self.val_idx]
 
         if print_shapes:
             print(f"{Colors.WARNING}Total number of chunks: {self.__len__()}{Colors.ENDC}")
+            # train_labels.mean() specifically gives open proportions
+            # 
+            print(f"Train: {len(self.train_idx)} chunks ({self.train_label.mean():.1%} open)")
+            print(f"Val:   {len(self.val_idx)} chunks ({self.val_label.mean():.1%} open)")
 
     def __len__(self) -> int:
-        return len(self.train_eeg_chunks)
+        return len(self.train_eeg)
 
     def __getitem__(
         self, index: int
@@ -386,11 +409,11 @@ class TemporalDataset(Dataset):
         masks for the given index from the training set.
         """
 
-        eeg = self.train_eeg_chunks[index]
-        bp = self.train_bp_chunks[index]
-        apps = self.train_app_chunks[index]
-        tokens = self.train_token_chunks[index]
-        labels = self.train_label_chunks[index]
+        eeg = self.train_eeg[index]
+        bp = self.train_bp[index]
+        apps = self.train_app[index]
+        tokens = self.train_token[index]
+        labels = self.train_label[index]
 
         # vqvae_tokens: (T,)
         reversed_tokens = tokens[::-1]
@@ -434,11 +457,11 @@ class TemporalDataset(Dataset):
         for the given index from the validation set.
         """
 
-        eeg = self.val_eeg_chunks[index]
-        bp = self.val_bp_chunks[index]
-        apps = self.val_app_chunks[index]
-        tokens = self.val_token_chunks[index]
-        labels = self.val_label_chunks[index]
+        eeg = self.val_eeg[index]
+        bp = self.val_bp[index]
+        apps = self.val_app[index]
+        tokens = self.val_token[index]
+        labels = self.val_label[index]
 
         return (
             torch.tensor(eeg),
@@ -447,3 +470,48 @@ class TemporalDataset(Dataset):
             torch.tensor(tokens),
             torch.tensor(labels),
         )
+
+    def _create_splits(self, val_ratio: float = 0.2):
+        # TODO write docstring and understand the code myself
+        # TODO fix because we have larger vocab_size now and not just binary
+        # labels, so we need to do a stratified split based on the
+        # distribution of tokens in each block, not just the mean of the labels
+
+        n_chunks = len(self.bp_chunks)
+
+        chunks_per_block = max(1, self.seq_len // self.stride)
+        n_blocks = n_chunks // chunks_per_block
+
+        block_labels = np.array([
+            int(np.mean(
+                self.label_chunks[b * chunks_per_block:(b + 1) * chunks_per_block]
+            ) > 0.5)
+            for b in range(n_blocks)
+        ])
+
+        rng = np.random.RandomState(42)
+
+        open_blocks = np.where(block_labels == 1)[0]
+        closed_blocks = np.where(block_labels == 0)[0]
+
+        rng.shuffle(open_blocks)
+        rng.shuffle(closed_blocks)
+
+        n_val_open = max(1, int(len(open_blocks) * val_ratio))
+        n_val_closed = max(1, int(len(closed_blocks) * val_ratio))
+
+        val_blocks = np.concatenate([open_blocks[:n_val_open], closed_blocks[:n_val_closed]])
+        train_blocks = np.concatenate([open_blocks[n_val_open:], closed_blocks[n_val_closed:]])
+
+        def blocks_to_chunks(block_ids):
+            chunk_ids = []
+            for b in block_ids:
+                start = b * chunks_per_block
+                end = min(start + chunks_per_block, n_chunks)
+                chunk_ids.extend(range(start, end))
+            return np.array(chunk_ids)
+
+        train_idx = blocks_to_chunks(train_blocks)
+        val_idx = blocks_to_chunks(val_blocks)
+
+        return train_idx, val_idx
