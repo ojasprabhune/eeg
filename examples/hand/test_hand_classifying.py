@@ -30,8 +30,8 @@ class HandClassifier(nn.Module):
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model = HandClassifier()
 ckpt_path = Path(
-    "~/Documents/research/hand_classifier/hand_classifier.pth_epoch_100.pth"
-).expanduser()
+    "models/hand_classifier/hand_classifier_epoch_100.pth"
+).resolve()
 if ckpt_path.exists():
     checkpoint = torch.load(ckpt_path, map_location=device)
     model.load_state_dict(checkpoint["model"])

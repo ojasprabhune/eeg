@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import wandb
 from torch.optim import Adam
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 from pathlib import Path
 
