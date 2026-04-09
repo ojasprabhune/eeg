@@ -43,7 +43,7 @@ This runs `scripts/bionic_hand/Demo/HandTracking/HandTracking/main.py` as part o
 You can also control the hand using a pre-recorded `.npy` file containing joint positions.
 1. Collect data using the data collection script:
    ```bash
-   python scripts/data/collect_data.py my_movement 10 --webcam True
+   uv run scripts/data/collect_data.py my_movement 10 --webcam True
    ```
 2. Run the dataflow with the preprocessed file:
    ```bash

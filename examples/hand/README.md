@@ -14,7 +14,7 @@ Runs a live webcam demo that uses MediaPipe to extract 21 hand landmarks (63 joi
 
 #### Running the script
 ```bash
-python examples/hand/test_hand_classifying.py
+uv run examples/hand/test_hand_classifying.py
 ```
 - **Checkpoint:** By default, it looks for the model checkpoint at `models/hand_classifier/hand_classifier_epoch_100.pth`.
 - **Exit:** Press 'q' to close the webcam window.

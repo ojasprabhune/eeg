@@ -12,13 +12,13 @@ This node provides hand tracking capabilities using MediaPipe to control the bio
 ### Webcam Tracking
 To run the webcam tracking node independently (requires a running dora daemon):
 ```bash
-python HandTracking/main.py
+uv run HandTracking/main.py
 ```
 
 ### Data Playback
 To control the hand using a saved `.npy` file:
 ```bash
-python HandTracking/data_control.py --data_file path/to/your_data.npy
+uv run HandTracking/data_control.py --data_file path/to/your_data.npy
 ```
 
 ## Configuration

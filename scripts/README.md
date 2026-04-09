@@ -21,7 +21,7 @@ Trains a Vector Quantized Variational Autoencoder (VQ-VAE) to compress 12-dimens
 
 #### Usage
 ```bash
-python scripts/train_vqvae.py <checkpoint_name>
+uv run scripts/train_vqvae.py <checkpoint_name>
 ```
 
 ---
