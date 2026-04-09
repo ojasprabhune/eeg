@@ -1,6 +1,6 @@
 # Core training and utility scripts
 
-This directory contains the primary training scripts for the EEG-to-Hand pipeline, including VQ-VAE for hand pose quantization and various LLM/Transformer architectures for sequence modeling.
+This directory contains the primary training and setup scripts for the EEG-to-Hand pipeline.
 
 ## Directory Structure
 
@@ -9,7 +9,7 @@ Utilities for data collection (MediaPipe), manual labeling, synchronization (tri
 See [data/README.md](data/README.md) for more details.
 
 ### `bionic_hand/`
-Integration and control code for the Pollen Robotics AmazingHand. Includes configurations for simulation (MuJoCo) and real hardware.
+Integration and control code for the Pollen Robotics AmazingHand. Includes configurations for simulation (MuJoCo), real hardware, and standalone setup scripts.
 See [bionic_hand/Demo/README.md](bionic_hand/Demo/README.md) for more details.
 
 ---
@@ -17,7 +17,7 @@ See [bionic_hand/Demo/README.md](bionic_hand/Demo/README.md) for more details.
 ## Training Scripts
 
 ### `train_vqvae.py`
-Trains a Vector Quantized Variational Autoencoder (VQ-VAE) to compress 12-dimensional hand appendage vectors into discrete latent representations (tokens). This allows the downstream LLM to operate on a discrete vocabulary rather than continuous values.
+Trains a Vector Quantized Variational Autoencoder (VQ-VAE) to compress 12-dimensional hand appendage vectors into discrete latent representations (tokens).
 
 #### Usage
 ```bash
@@ -26,15 +26,10 @@ uv run scripts/train_vqvae.py <checkpoint_name>
 
 ---
 
-### `train_big_eeg_llm.py`
-A main training script for the sequence-to-sequence model that regresses EEG signals directly to hand appendage tokens and durations. It incorporates pre-trained LaBraM backbones and the VQ-VAE tokenizer.
-
----
-
 ### `train_temporal_model.py`
-A utility script for initializing and testing the `TemporalDataset` from the `gesture2hand` module, which prepares bandpower features from raw EEG for temporal classification.
+A utility script for initializing and training the `TemporalModel` on the `gesture2hand` dataset, which processes bandpower features from raw EEG for temporal classification.
 
----
-
-### `train_e2e.py` (Legacy/Reference)
-An end-to-end training script for the autoregressive Position LLM, used for validating the discrete tokenization and next-position prediction pipeline.
+#### Usage
+```bash
+uv run scripts/train_temporal_model.py
+```
