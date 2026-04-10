@@ -45,64 +45,56 @@ dataset = TemporalDataset(
 )
 
 
-# # --- class balancing ---
+# --- class balancing ---
 
-# n_open = (train_labels == 1).sum()
-# n_closed = (train_labels == 0).sum()
-# pos_weight = torch.tensor([n_closed / max(n_open, 1)], dtype=torch.float32).to(device)
-# print(
-#     f"Class balance - open: {n_open}, closed: {n_closed}, pos_weight: {pos_weight.item():.3f}"
-# )
+n_open = (train_labels == 1).sum()
+n_closed = (train_labels == 0).sum()
+pos_weight = torch.tensor([n_closed / max(n_open, 1)], dtype=torch.float32).to(device)
+print(
+    f"Class balance - open: {n_open}, closed: {n_closed}, pos_weight: {pos_weight.item():.3f}"
+)
 
-# sample_weights = np.where(train_labels == 1, n_closed / max(n_open, 1), 1.0)
-# sampler = WeightedRandomSampler(
-#     weights=sample_weights.tolist(),
-#     num_samples=len(train_labels),
-#     replacement=True,
-# )
+sample_weights = np.where(train_labels == 1, n_closed / max(n_open, 1), 1.0)
+sampler = WeightedRandomSampler(
+    weights=sample_weights.tolist(),
+    num_samples=len(train_labels),
+    replacement=True,
+)
 
-# train_ds = TensorDataset(
-#     torch.from_numpy(train_feats), torch.from_numpy(train_labels).float()
-# )
-# val_ds = TensorDataset(
-#     torch.from_numpy(val_feats), torch.from_numpy(val_labels).float()
-# )
-
-# train_loader = DataLoader(
-#     train_ds, batch_size=batch_size, sampler=sampler, drop_last=True
-# )
-# val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False)
+train_loader = DataLoader(
+    train_ds, batch_size=batch_size, sampler=sampler, drop_last=True
+)
+val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False)
 
 
-# # --- model ---
+# --- model ---
 
-# model = TemporalModel(
-#     num_features=num_features,
-#     d_model=d_model,
-#     num_heads=num_heads,
-#     num_layers=num_layers,
-#     dropout=dropout,
-#     vocab_size=vocab_size
-# ).to(device)
+model = TemporalModel(
+    num_features=num_features,
+    d_model=d_model,
+    num_heads=num_heads,
+    num_layers=num_layers,
+    dropout=dropout,
+    vocab_size=vocab_size,
+).to(device)
 
-# param_count = sum(p.numel() for p in model.parameters() if p.requires_grad)
-# print(f"Number of model parameters: {param_count:,}")
-# wandb.log({"param_count": param_count})
+param_count = sum(p.numel() for p in model.parameters() if p.requires_grad)
+print(f"Number of model parameters: {param_count:,}")
+wandb.log({"param_count": param_count})
 
-# # --- optimizer ---
+# --- optimizer ---
 
-# optimizer = torch.optim.AdamW(model.parameters(), lr=base_lr, weight_decay=0.01)
-
-
-# def warmup_cosine_lr(step: int) -> float:
-#     if step < warmup_steps:
-#         return step / max(warmup_steps, 1)
-#     total_steps = epochs * len(train_loader)
-#     progress = (step - warmup_steps) / max(total_steps - warmup_steps, 1)
-#     return 0.5 * (1.0 + math.cos(math.pi * progress))
+optimizer = torch.optim.AdamW(model.parameters(), lr=base_lr, weight_decay=0.01)
 
 
-# scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, warmup_cosine_lr)
+def warmup_cosine_lr(step: int) -> float:
+    if step < warmup_steps:
+        return step / max(warmup_steps, 1)
+    total_steps = epochs * len(train_loader)
+    progress = (step - warmup_steps) / max(total_steps - warmup_steps, 1)
+    return 0.5 * (1.0 + math.cos(math.pi * progress))
 
-# loss_fn = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 
+scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, warmup_cosine_lr)
+
+loss_fn = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
