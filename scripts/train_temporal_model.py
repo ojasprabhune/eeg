@@ -4,14 +4,14 @@ transformer-based architecture that takes in sequences of bandpower features and
 predicts the corresponding hand gesture labels.
 """
 
-import yaml
 import math
-import wandb
-import numpy as np
+
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader, TensorDataset, WeightedRandomSampler
+import yaml
+from torch.utils.data import DataLoader, WeightedRandomSampler
 
+import wandb
 from eeg.gesture2hand import TemporalDataset, TemporalModel
 
 with open("config/temporal.yaml", "r") as config_file:
@@ -38,34 +38,20 @@ with open("config/temporal.yaml", "r") as config_file:
     save_ckpt_path = config["save_ckpt_path"]
     save_every = config["save_every"]
 
-dataset = TemporalDataset(
-    seq_len=sequence_length,
-    stride=stride,
-    device=device,
+train_dataset = TemporalDataset(
+    mode="train", seq_len=sequence_length, stride=stride, device=device, verbose=True
 )
+weights, class_weights = train_dataset.get_sampler_weights()
 
-
-# --- class balancing ---
-
-n_open = (train_labels == 1).sum()
-n_closed = (train_labels == 0).sum()
-pos_weight = torch.tensor([n_closed / max(n_open, 1)], dtype=torch.float32).to(device)
-print(
-    f"Class balance - open: {n_open}, closed: {n_closed}, pos_weight: {pos_weight.item():.3f}"
-)
-
-sample_weights = np.where(train_labels == 1, n_closed / max(n_open, 1), 1.0)
 sampler = WeightedRandomSampler(
-    weights=sample_weights.tolist(),
-    num_samples=len(train_labels),
-    replacement=True,
+    weights=weights, num_samples=len(weights), replacement=True
 )
 
 train_loader = DataLoader(
-    train_ds, batch_size=batch_size, sampler=sampler, drop_last=True
+    train_dataset, batch_size=batch_size, sampler=sampler, drop_last=True
 )
-val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False)
 
+loss_fn = nn.CrossEntropyLoss(weight=class_weights.to(device))
 
 # --- model ---
 
@@ -96,5 +82,3 @@ def warmup_cosine_lr(step: int) -> float:
 
 
 scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, warmup_cosine_lr)
-
-loss_fn = nn.BCEWithLogitsLoss(pos_weight=pos_weight)

@@ -276,7 +276,7 @@ class TemporalDataset(Dataset):
         for path in sorted(Path(f"{hand_data_path}").rglob("*labels_cut.npy")):
             self.label_files.append(np.load(path))
 
-        self.labels = np.concatenate(self.label_files, axis=0)  # along time dim
+        self.labels = np.concatenate(self.label_files, axis=0) - 1
 
         # --- appendages + regions --------------------------------------------
 
@@ -397,10 +397,10 @@ class TemporalDataset(Dataset):
         # of same shape. np.where gives us the indices of the blocks that belong
         # to each class. [0] is to get the indices from the tuple output of
         # np.where
-        fist_block_ids = np.where(block_labels == 1)[0]
-        left_block_ids = np.where(block_labels == 2)[0]
-        finger_block_ids = np.where(block_labels == 3)[0]
-        open_block_ids = np.where(block_labels == 4)[0]
+        fist_block_ids = np.where(block_labels == 0)[0]
+        left_block_ids = np.where(block_labels == 1)[0]
+        finger_block_ids = np.where(block_labels == 2)[0]
+        open_block_ids = np.where(block_labels == 3)[0]
 
         # randomly shuffle each class separately. preserve class balance before
         # splitting
@@ -555,3 +555,27 @@ class TemporalDataset(Dataset):
             torch.tensor(durations),
             torch.tensor(masks),
         )
+
+    def get_sampler_weights(self) -> tuple[list[int], torch.Tensor]:
+        # self.label_chunks is (N, seq_len). we want the label that defines the
+        # chunk. find the majority label of the sequence (the mode).
+        chunk_labels = np.array([np.bincount(c).argmax() for c in self.label_chunks])
+
+        # count instances of each class (1, 2, 3, 4)
+        class_counts = np.bincount(chunk_labels)
+
+        # calculate weight per class: total / (num classes * class count). this
+        # makes rare classes have very high weights.
+        total_samples = len(chunk_labels)
+        weights_per_class = total_samples / (4 * (class_counts))
+        print(weights_per_class.shape)
+        quit()
+
+        # assign the specific weight to every individual sample
+        sample_weights = [weights_per_class[int(label)] for label in chunk_labels]
+
+        # 4. For the Loss function, we need the weight per class as a tensor
+        # Skip index 0 because your classes are 1, 2, 3, 4
+        class_weights_tensor = torch.tensor(weights_per_class[1:], dtype=torch.float32)
+
+        return sample_weights, class_weights_tensor
