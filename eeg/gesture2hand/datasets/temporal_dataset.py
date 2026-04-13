@@ -200,7 +200,7 @@ class TemporalDataset(Dataset):
                 ]
                 raw.drop_channels(extra_channels)
             self.raws.append(raw)
-            break  # TODO remove this to load all data
+            # break  # TODO remove this to load all data
 
         # - filtering -
         self.raw = mne.concatenate_raws(self.raws, preload=True, verbose=False)
@@ -284,7 +284,7 @@ class TemporalDataset(Dataset):
         self.hands = []
         for path in sorted(Path(f"{hand_data_path}").rglob("*hands_cut.npy")):
             self.hands.append(np.load(path))
-            break  # TODO remove this to load all data
+            # break  # TODO remove this to load all data
 
         self.raw_app_data = np.concatenate(self.hands, axis=1)  # along time dim
         self.data_joints = JointData(self.raw_app_data)
@@ -356,6 +356,12 @@ class TemporalDataset(Dataset):
             self.token_chunks.append(token_chunk)
             self.label_chunks.append(label_chunk)
 
+        self.eeg_chunks = np.array(self.eeg_chunks, dtype=np.float32)
+        self.bp_chunks = np.array(self.bp_chunks, dtype=np.float32)
+        self.app_chunks = np.array(self.app_chunks, dtype=np.float32)
+        self.token_chunks = np.array(self.token_chunks, dtype=np.int64)
+        self.label_chunks = np.array(self.label_chunks, dtype=np.int64)
+
         # --- train-val split -------------------------------------------------
 
         # total number of chunks we have created from the data
@@ -369,6 +375,15 @@ class TemporalDataset(Dataset):
         # total number of bandpower chunks available. each chunk = one
         # timestep (or small window)
         n_blocks = n_chunks // chunks_per_block
+
+        if verbose:
+            print(Colors.HEADER)
+            print("EEG chunks (30Hz):   ", self.eeg_data.shape)
+            print("Bandpower chunks:    ", self.bandpower_features.shape)
+            print("Appendages chunks:   ", self.app_data.shape)
+            print("VQ-VAE tokens chunks:", self.vqvae_tokens_all.shape)
+            print("Labels chunks:       ", self.labels.shape)
+            print(Colors.ENDC)
 
         # labels in each block
         block_labels = np.array(
@@ -384,12 +399,14 @@ class TemporalDataset(Dataset):
                     np.bincount(
                         self.label_chunks[
                             b * chunks_per_block : (b + 1) * chunks_per_block
-                        ]
+                        ].flatten()
                     ).argmax()
                 )
                 for b in range(n_blocks)
             ]
         )  # (n_blocks,)
+
+        print("hello", block_labels.shape)
 
         rng = np.random.RandomState(42)
 
@@ -401,6 +418,11 @@ class TemporalDataset(Dataset):
         left_block_ids = np.where(block_labels == 1)[0]
         finger_block_ids = np.where(block_labels == 2)[0]
         open_block_ids = np.where(block_labels == 3)[0]
+
+        print("fist ids", fist_block_ids.shape)
+        print("left ids", left_block_ids.shape)
+        print("finger ids", finger_block_ids.shape)
+        print("open ids", open_block_ids.shape)
 
         # randomly shuffle each class separately. preserve class balance before
         # splitting
@@ -574,8 +596,7 @@ class TemporalDataset(Dataset):
         # assign the specific weight to every individual sample
         sample_weights = [weights_per_class[int(label)] for label in chunk_labels]
 
-        # 4. For the Loss function, we need the weight per class as a tensor
-        # Skip index 0 because your classes are 1, 2, 3, 4
-        class_weights_tensor = torch.tensor(weights_per_class[1:], dtype=torch.float32)
+        # for the Loss function, we need the weight per class as a tensor
+        class_weights_tensor = torch.tensor(weights_per_class, dtype=torch.float32)
 
         return sample_weights, class_weights_tensor
