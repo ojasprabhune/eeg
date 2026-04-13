@@ -50,13 +50,13 @@ class TemporalModel(nn.Module):
         self.norm = nn.LayerNorm(d_model)
 
         # weighted pooling: learn which timesteps matter
-        self.attn_pool = nn.Linear(d_model, vocab_size)
+        self.attn_pool = nn.Linear(d_model, 1)
 
         self.head = nn.Sequential(
             nn.Linear(d_model, 32),
             nn.GELU(),
             nn.Dropout(dropout),
-            nn.Linear(32, 1),
+            nn.Linear(32, vocab_size),
         )
 
     def forward(self, features: torch.Tensor) -> torch.Tensor:

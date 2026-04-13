@@ -113,10 +113,12 @@ def train():
             bp = bp.to(device)
             labels = labels.to(device)
 
-            label_logits = model(bp) # out: (B, T, vocab_size)
-            label_logits = label_logits.transpose(1, 2) # (B, T, vocab_size) -> (B, vocab_size, T)
+            label_logits = model(bp) # out: (B, vocab_size)
+            print(label_logits.shape)
+            print(labels.shape)
+            quit()
 
-            loss = loss_fn(label_logits, tokens)
+            loss = loss_fn(label_logits, labels)
 
             iter_tqdm.set_postfix({"loss": loss.item()})
             run.log({"loss": loss.item()})

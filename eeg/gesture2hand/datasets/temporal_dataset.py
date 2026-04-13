@@ -542,23 +542,24 @@ class TemporalDataset(Dataset):
             torch.tensor(masks),
         )
 
-    def get_sampler_weights(self) -> tuple[list[int], torch.Tensor]:
+    def get_sampler_weights(self) -> tuple[list[float], torch.Tensor]:
         # self.label_chunks is (N, seq_len). we want the label that defines the
         # chunk. find the majority label of the sequence (the mode).
         chunk_labels = np.array([np.bincount(c).argmax() for c in self.label_chunks])
 
-        # count instances of each class (1, 2, 3, 4)
-        class_counts = np.bincount(chunk_labels)
+        # force a fixed class count length so absent classes are handled safely.
+        num_classes = 4
+        class_counts = np.bincount(chunk_labels, minlength=num_classes)
 
-        # calculate weight per class: total / (num classes * class count). this
-        # makes rare classes have very high weights.
+        # calculate weight per class: total / (num_classes * class count).
+        # add a tiny epsilon to avoid division by zero if a class isn't present.
         total_samples = len(chunk_labels)
-        weights_per_class = total_samples / (4 * (class_counts))
+        weights_per_class = total_samples / (num_classes * (class_counts + 1e-8))
 
         # assign the specific weight to every individual sample
-        sample_weights = [weights_per_class[int(label)] for label in chunk_labels]
+        sample_weights = [float(weights_per_class[int(label)]) for label in chunk_labels]
 
-        # for the Loss function, we need the weight per class as a tensor
+        # for CrossEntropyLoss we need a fixed-length weight tensor
         class_weights_tensor = torch.tensor(weights_per_class, dtype=torch.float32)
 
         return sample_weights, class_weights_tensor
