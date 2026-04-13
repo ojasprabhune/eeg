@@ -200,7 +200,6 @@ class TemporalDataset(Dataset):
                 ]
                 raw.drop_channels(extra_channels)
             self.raws.append(raw)
-            # break  # TODO remove this to load all data
 
         # - filtering -
         self.raw = mne.concatenate_raws(self.raws, preload=True, verbose=False)
@@ -284,7 +283,6 @@ class TemporalDataset(Dataset):
         self.hands = []
         for path in sorted(Path(f"{hand_data_path}").rglob("*hands_cut.npy")):
             self.hands.append(np.load(path))
-            # break  # TODO remove this to load all data
 
         self.raw_app_data = np.concatenate(self.hands, axis=1)  # along time dim
         self.data_joints = JointData(self.raw_app_data)
@@ -329,11 +327,7 @@ class TemporalDataset(Dataset):
 
         # --- sequences -------------------------------------------------------
 
-        self.eeg_chunks = []
-        self.app_chunks = []
-        self.token_chunks = []
-        self.bp_chunks = []
-        self.label_chunks = []
+        all_eeg, all_bp, all_app, all_tokens, all_labels = [], [], [], [], []
 
         # we iterate over the data in steps of stride, creating chunks of length
         # seq_len. for each chunk, we extract the corresponding segments of
@@ -344,23 +338,17 @@ class TemporalDataset(Dataset):
         # bandpower, and appendage data, and (num_chunks, seq_len) for tokens
         # and labels
         for i in range(0, min_len - seq_len + 1, stride):
-            eeg_chunk = self.eeg_data[i : i + seq_len, :]  # (seq_len, 14)
-            bp_chunk = self.bandpower_features[i : i + seq_len, :]  # (seq_len, 84)
-            app_chunk = self.app_data[i : i + seq_len, :]  # (seq_len, 12)
-            token_chunk = self.vqvae_tokens_all[i : i + seq_len]  # (seq_len,)
-            label_chunk = self.labels[i : i + seq_len]
+            all_eeg.append(self.eeg_data[i : i + seq_len, :])
+            all_bp.append(self.bandpower_features[i : i + seq_len, :])
+            all_app.append(self.app_data[i : i + seq_len, :])
+            all_tokens.append(self.vqvae_tokens_all[i : i + seq_len])
+            all_labels.append(self.labels[i : i + seq_len])
 
-            self.eeg_chunks.append(eeg_chunk)
-            self.bp_chunks.append(bp_chunk)
-            self.app_chunks.append(app_chunk)
-            self.token_chunks.append(token_chunk)
-            self.label_chunks.append(label_chunk)
-
-        self.eeg_chunks = np.array(self.eeg_chunks, dtype=np.float32)
-        self.bp_chunks = np.array(self.bp_chunks, dtype=np.float32)
-        self.app_chunks = np.array(self.app_chunks, dtype=np.float32)
-        self.token_chunks = np.array(self.token_chunks, dtype=np.int64)
-        self.label_chunks = np.array(self.label_chunks, dtype=np.int64)
+        self.eeg_chunks = np.array(all_eeg, dtype=np.float32)
+        self.bp_chunks = np.array(all_bp, dtype=np.float32)
+        self.app_chunks = np.array(all_app, dtype=np.float32)
+        self.token_chunks = np.array(all_tokens, dtype=np.int64)
+        self.label_chunks = np.array(all_labels, dtype=np.int64)
 
         # --- train-val split -------------------------------------------------
 
@@ -385,28 +373,23 @@ class TemporalDataset(Dataset):
             print("Labels chunks:       ", self.labels.shape)
             print(Colors.ENDC)
 
-        # labels in each block
-        block_labels = np.array(
-            # select all labels inside block b and compute the most common label
-            # value in that block. this is a more general approach that works
-            # for multi-class labels, where we take the mode (most frequent
-            # label) instead of the mean. the argmax of the bincount gives us
-            # the most common label in that block, and we convert it to an
-            # integer. this way we can assign a single label to each block based
-            # on the majority class
-            [
-                int(
-                    np.bincount(
-                        self.label_chunks[
-                            b * chunks_per_block : (b + 1) * chunks_per_block
-                        ].flatten()
-                    ).argmax()
-                )
-                for b in range(n_blocks)
-            ]
-        )  # (n_blocks,)
+        # select all labels inside block b and compute the most common label
+        # value in that block. this is a more general approach that works
+        # for multi-class labels, where we take the mode (most frequent
+        # label) instead of the mean. the argmax of the bincount gives us
+        # the most common label in that block, and we convert it to an
+        # integer. this way we can assign a single label to each block based
+        # on the majority class
+        block_labels = []
+        for b in range(n_blocks):
+            # extract all labels for all chunks belonging to this block
+            block_data = self.label_chunks[b * chunks_per_block : (b + 1) * chunks_per_block].flatten()
+            # node of labels in the block
+            block_labels.append(int(np.bincount(block_data).argmax())) # (n_blocks,)
+        block_labels = np.array(block_labels)
 
-        print("hello", block_labels.shape)
+        if verbose:
+            print("Number of blocks:", block_labels.shape, "\n")
 
         rng = np.random.RandomState(42)
 
@@ -416,48 +399,34 @@ class TemporalDataset(Dataset):
         # np.where
         fist_block_ids = np.where(block_labels == 0)[0]
         left_block_ids = np.where(block_labels == 1)[0]
-        finger_block_ids = np.where(block_labels == 2)[0]
+        fingers_block_ids = np.where(block_labels == 2)[0]
         open_block_ids = np.where(block_labels == 3)[0]
-
-        print("fist ids", fist_block_ids.shape)
-        print("left ids", left_block_ids.shape)
-        print("finger ids", finger_block_ids.shape)
-        print("open ids", open_block_ids.shape)
 
         # randomly shuffle each class separately. preserve class balance before
         # splitting
         rng.shuffle(fist_block_ids)
         rng.shuffle(left_block_ids)
-        rng.shuffle(finger_block_ids)
+        rng.shuffle(fingers_block_ids)
         rng.shuffle(open_block_ids)
 
+        # calculate class-specific split points
+        def get_split(ids):
+            split = max(1, int(len(ids) * val_ratio))
+            return ids[:split], ids[split:]
+
         # determine how many blocks to allocate to the validation set for each
-        n_val_fist = max(1, int(len(open_block_ids) * val_ratio))
-        n_val_left = max(1, int(len(left_block_ids) * val_ratio))
-        n_val_finger = max(1, int(len(finger_block_ids) * val_ratio))
-        n_val_open = max(1, int(len(open_block_ids) * val_ratio))
+        v_fist, t_fist = get_split(fist_block_ids)
+        v_left, t_left = get_split(left_block_ids)
+        v_finger, t_finger = get_split(fingers_block_ids)
+        v_open, t_open = get_split(open_block_ids)
 
         # concatenate the validation blocks from each class to form the complete
         # validation set, and the remaining blocks form the training set. this
         # way we ensure that the validation set has a representative sample of
         # each class, and we can evaluate our model's performance on a balanced
         # subset of the data
-        val_block_ids = np.concatenate(
-            [
-                fist_block_ids[:n_val_fist],
-                left_block_ids[:n_val_left],
-                finger_block_ids[:n_val_finger],
-                open_block_ids[:n_val_open],
-            ]
-        )
-        train_block_ids = np.concatenate(
-            [
-                fist_block_ids[n_val_fist:],
-                left_block_ids[n_val_left:],
-                finger_block_ids[n_val_finger:],
-                open_block_ids[n_val_open:],
-            ]
-        )
+        val_block_ids = np.concatenate([v_fist, v_left, v_finger, v_open])
+        train_block_ids = np.concatenate([t_fist, t_left, t_finger, t_open])
 
         # filter data based on mode
         if mode == "train":
@@ -471,53 +440,45 @@ class TemporalDataset(Dataset):
         # the range of chunk indices for that block. this way we can easily
         # select the chunks that belong to the training and validation sets
         # based on the block indices we determined earlier
-        def blocks_to_chunks(block_ids: np.ndarray) -> np.ndarray:
-            chunk_ids = []
-            for b in block_ids:
-                start = b * chunks_per_block  # first chunk index for block b
 
-                # last chunk index (exclusive). min prevents overflow at
-                # dataset end
-                end = min(start + chunks_per_block, n_chunks)
+        split_idx = []
+        for b in target_block_ids:
+            start = b * chunks_per_block  # first chunk index for block b
 
-                # add all chunk indicies in this block
-                chunk_ids.extend(range(start, end))
-            return np.array(chunk_ids)  # shape (num_chunks_in_split,)
+            # last chunk index (exclusive). min prevents overflow at
+            # dataset end
+            end = min(start + chunks_per_block, n_chunks)
 
-        print(f"{Colors.OKBLUE}Splitting data into train and val sets...{Colors.ENDC}")
+            # add all chunk indicies in this block
+            split_idx.extend(range(start, end))
+        split_idx = np.array(split_idx)
 
-        split_idx = blocks_to_chunks(target_block_ids)
-
-        # TODO test split index shape and check that four types of classes work
-        print("split_idx.shape:", split_idx.shape)
+        print(f"{Colors.OKBLUE}Splitting data into train and val sets...{Colors.ENDC}\n")
 
         # these chunks are of shape (num_chunks, seq_len, feature_dim) for eeg,
         # bandpower, and appendage data, and (num_chunks, seq_len) for tokens
         # and labels
 
-        self.eeg_chunks = np.array(self.eeg_chunks, dtype=np.float32)
-        self.bp_chunks = np.array(self.bp_chunks, dtype=np.float32)
-        self.app_chunks = np.array(self.app_chunks, dtype=np.float32)
-        self.token_chunks = np.array(self.token_chunks, dtype=np.int64)
-        self.label_chunks = np.array(self.label_chunks, dtype=np.int64)
-
-        self.eeg_chunks = self.eeg_chunks[split_idx]
-        self.bp_chunks = self.bp_chunks[split_idx]
-        self.app_chunks = self.app_chunks[split_idx]
-        self.token_chunks = self.token_chunks[split_idx]
-        self.label_chunks = self.label_chunks[split_idx]
+        self.eeg_chunks_split = self.eeg_chunks[split_idx]
+        self.bp_chunks_split = self.bp_chunks[split_idx]
+        self.app_chunks_split = self.app_chunks[split_idx]
+        self.token_chunks_split = self.token_chunks[split_idx]
+        self.label_chunks_split = self.label_chunks[split_idx]
 
         if verbose:
+            fist_pct = (self.label_chunks_split == 0).mean()
+            left_pct = (self.label_chunks_split == 1).mean()
+            fingers_pct = (self.label_chunks_split == 2).mean()
+            open_pct = (self.label_chunks_split == 3).mean()
+
             print(
-                f"{Colors.WARNING}Total number of chunks: {self.__len__()}{Colors.ENDC}"
+                f"{Colors.WARNING}Total number of chunks: {self.__len__()}{Colors.ENDC}\n"
             )
-            # train_labels.mean() specifically gives open proportions
-            print(
-                f"Train: {len(split_idx)} chunks ({self.label_chunks.mean():.1%} open)"
-            )
-            print(
-                f"Val:   {len(split_idx)} chunks ({self.label_chunks.mean():.1%} open)"
-            )
+            print(f"Training/validation split index: {len(split_idx)}\n")
+            print(f"Fist chunks ({fist_pct:.1%} open)")
+            print(f"Left chunks ({left_pct:.1%} open)")
+            print(f"Fingers chunks ({fingers_pct:.1%} open)")
+            print(f"Open chunks ({open_pct:.1%} open)\n")
 
     def __len__(self) -> int:
         return len(self.bp_chunks)
@@ -590,8 +551,6 @@ class TemporalDataset(Dataset):
         # makes rare classes have very high weights.
         total_samples = len(chunk_labels)
         weights_per_class = total_samples / (4 * (class_counts))
-        print(weights_per_class.shape)
-        quit()
 
         # assign the specific weight to every individual sample
         sample_weights = [weights_per_class[int(label)] for label in chunk_labels]

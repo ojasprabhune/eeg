@@ -66,7 +66,7 @@ model = TemporalModel(
 
 param_count = sum(p.numel() for p in model.parameters() if p.requires_grad)
 print(f"Number of model parameters: {param_count:,}")
-wandb.log({"param_count": param_count})
+# wandb.log({"param_count": param_count})
 
 # --- optimizer ---
 
