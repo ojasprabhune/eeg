@@ -9,6 +9,7 @@ import math
 import torch
 import torch.nn as nn
 import yaml
+from tqdm import tqdm
 from torch.utils.data import DataLoader, WeightedRandomSampler
 
 import wandb
@@ -38,9 +39,12 @@ with open("config/temporal.yaml", "r") as config_file:
     save_ckpt_path = config["save_ckpt_path"]
     save_every = config["save_every"]
 
+# --- dataset & loss function ---
+
 train_dataset = TemporalDataset(
     mode="train", seq_len=sequence_length, stride=stride, device=device, verbose=True
 )
+
 weights, class_weights = train_dataset.get_sampler_weights()
 
 sampler = WeightedRandomSampler(
@@ -66,11 +70,8 @@ model = TemporalModel(
 
 param_count = sum(p.numel() for p in model.parameters() if p.requires_grad)
 print(f"Number of model parameters: {param_count:,}")
-# wandb.log({"param_count": param_count})
 
 # --- optimizer ---
-
-optimizer = torch.optim.AdamW(model.parameters(), lr=base_lr, weight_decay=0.01)
 
 
 def warmup_cosine_lr(step: int) -> float:
@@ -81,4 +82,68 @@ def warmup_cosine_lr(step: int) -> float:
     return 0.5 * (1.0 + math.cos(math.pi * progress))
 
 
+optimizer = torch.optim.AdamW(model.parameters(), lr=base_lr, weight_decay=0.01)
 scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, warmup_cosine_lr)
+
+
+def train():
+    run = wandb.init(
+        name=run_name,
+        entity="prabhuneojas-evergreen-valley-high-school",
+        project="eeg",
+        config={
+            "learning_rate": base_lr,
+            "architecture": "TransformerEncoder",
+            "dataset": "temporal_dataset",
+            "epochs": epochs,
+        },
+    )
+    
+    wandb.log({"param_count": param_count})
+    model.to(device)
+
+    epoch_tqdm = tqdm(range(epochs), dynamic_ncols=True)
+    for i in epoch_tqdm:
+        epoch_tqdm.set_description(f"Epoch {i + 1}")
+
+        iter_tqdm = tqdm(train_loader, dynamic_ncols=True)
+        for eeg, bp, apps, tokens, labels, durations, masks in iter_tqdm:
+            # chunk: (B, T, C)
+
+            bp = bp.to(device)
+            labels = labels.to(device)
+
+            label_logits = model(bp) # out: (B, T, vocab_size)
+            label_logits = label_logits.transpose(1, 2) # (B, T, vocab_size) -> (B, vocab_size, T)
+
+            loss = loss_fn(label_logits, tokens)
+
+            iter_tqdm.set_postfix({"loss": loss.item()})
+            run.log({"loss": loss.item()})
+
+            optimizer.zero_grad()  # optimizer has access to all model params, makes grads 0
+            loss.backward()  # calculates and adds gradients to params so optim sees
+            optimizer.step()  # optim looks at gradients and steps accordingly
+
+
+        if (i + 1) % save_every == 0:
+            latest_ckpt = {
+                "epochs": i,
+                "model": model.state_dict(),
+                "optimizer": optimizer.state_dict(),
+            }
+
+            torch.save(latest_ckpt, f"{save_ckpt_path}_epoch_{i + 1}.pth")
+
+    run.finish()
+
+
+train()
+
+latest_ckpt = {
+    "epochs": epochs,
+    "model": model.state_dict(),
+    "optimizer": optimizer.state_dict(),
+}
+
+torch.save(latest_ckpt, save_ckpt_path)

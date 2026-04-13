@@ -18,8 +18,8 @@ warmup_steps: 4000
 base_lr: 5e-5
 epochs: 5000
 
-run_name: eeg_lstm
+run_name: temporal
 # use_ckpt_path: /var/log/thavamount/eeg_ckpts/eeg_lm/eeg_llm.pth
 use_ckpt_path: None
-save_ckpt_path: /var/log/thavamount/eeg_ckpts/eeg_lm/lstm/eeg_lstm
-save_every: 50
+save_ckpt_path: /var/log/thavamount/eeg_ckpts/temporal/temporal
+save_every: 200

@@ -6,7 +6,7 @@ from .transformer import PositionalEncoding
 
 class TemporalModel(nn.Module):
     """
-    Bandpower features (B, T, 84) -> temporal transformer -> logit (B, 1)
+    Bandpower features (B, T, 84) -> temporal transformer -> logit (B, 4)
 
     Unlike the linear baseline which mean-pools (destroying temporal info),
     this model processes the sequence of bandpower snapshots to capture
