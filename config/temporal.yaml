@@ -14,8 +14,8 @@ vocab_size: 4
 device: cpu
 batch_size: 32
 seq_length: 60
-warmup_steps: 4000
-base_lr: 5e-5
+warmup_steps: 500
+base_lr: 2e-4
 epochs: 5000
 
 run_name: temporal

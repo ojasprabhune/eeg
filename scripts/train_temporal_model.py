@@ -101,6 +101,7 @@ def train():
     
     wandb.log({"param_count": param_count})
     model.to(device)
+    model.train()
 
     epoch_tqdm = tqdm(range(epochs), dynamic_ncols=True)
     for i in epoch_tqdm:
@@ -126,6 +127,7 @@ def train():
             optimizer.zero_grad()  # optimizer has access to all model params, makes grads 0
             loss.backward()  # calculates and adds gradients to params so optim sees
             optimizer.step()  # optim looks at gradients and steps accordingly
+            scheduler.step() # steps lr
 
 
         if (i + 1) % save_every == 0:

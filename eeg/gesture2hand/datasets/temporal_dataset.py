@@ -508,6 +508,8 @@ class TemporalDataset(Dataset):
         tokens = self.token_chunks[index]
         labels = self.label_chunks[index]
 
+        label = np.bincount(labels).argmax()
+
         # vqvae_tokens: (T,)
         reversed_tokens = tokens[::-1]
         durations = [1]
@@ -537,7 +539,7 @@ class TemporalDataset(Dataset):
             torch.tensor(bp),
             torch.tensor(apps),
             torch.tensor(tokens),
-            torch.tensor(labels),
+            torch.tensor(label),
             torch.tensor(durations),
             torch.tensor(masks),
         )
