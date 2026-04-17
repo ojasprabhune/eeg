@@ -15,11 +15,11 @@ device: cpu
 batch_size: 32
 seq_length: 60
 warmup_steps: 500
-base_lr: 2e-4
-epochs: 5000
+base_lr: 1e-4
+epochs: 2000
 
 run_name: temporal
 # use_ckpt_path: /var/log/thavamount/eeg_ckpts/eeg_lm/eeg_llm.pth
 use_ckpt_path: None
 save_ckpt_path: /var/log/thavamount/eeg_ckpts/temporal/temporal
-save_every: 200
+save_every: 250

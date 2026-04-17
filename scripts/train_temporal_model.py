@@ -115,9 +115,6 @@ def train():
             labels = labels.to(device)
 
             label_logits = model(bp) # out: (B, vocab_size)
-            print(label_logits.shape)
-            print(labels.shape)
-            quit()
 
             loss = loss_fn(label_logits, labels)
 

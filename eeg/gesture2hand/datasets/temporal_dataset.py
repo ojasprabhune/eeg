@@ -200,7 +200,6 @@ class TemporalDataset(Dataset):
                 ]
                 raw.drop_channels(extra_channels)
             self.raws.append(raw)
-            break
 
         # - filtering -
         self.raw = mne.concatenate_raws(self.raws, preload=True, verbose=False)
@@ -275,7 +274,6 @@ class TemporalDataset(Dataset):
         self.label_files = []
         for path in sorted(Path(f"{hand_data_path}").rglob("*labels_cut.npy")):
             self.label_files.append(np.load(path))
-            break
 
         self.labels = np.concatenate(self.label_files, axis=0) - 1
 
@@ -285,7 +283,6 @@ class TemporalDataset(Dataset):
         self.hands = []
         for path in sorted(Path(f"{hand_data_path}").rglob("*hands_cut.npy")):
             self.hands.append(np.load(path))
-            break
 
         self.raw_app_data = np.concatenate(self.hands, axis=1)  # along time dim
         self.data_joints = JointData(self.raw_app_data)
