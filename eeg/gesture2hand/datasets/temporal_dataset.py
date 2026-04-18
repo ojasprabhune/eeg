@@ -37,6 +37,8 @@ def compute_bandpower_features(
     -------
     features : np.ndarray, shape (T_out, 84)
         14 channels × 6 features (theta, mu, beta, low_gamma, mu/beta, total).
+
+    TODO calculate z-score stats on training data only for research paper
     """
     T, C = eeg_128hz.shape
     nperseg = int(window_sec * sfreq)  # number of samples in a window
@@ -481,10 +483,10 @@ class TemporalDataset(Dataset):
             print(f"Open chunks ({open_pct:.1%} open)\n")
 
     def __len__(self) -> int:
-        return len(self.bp_chunks)
+        return len(self.bp_chunks_split)
 
     def __getitem__(
-        self, index: int
+        self, index: int | float
     ) -> tuple[
         torch.Tensor,
         torch.Tensor,
@@ -499,11 +501,16 @@ class TemporalDataset(Dataset):
         masks for the given index from the training set.
         """
 
-        eeg = self.eeg_chunks[index]
-        bp = self.bp_chunks[index]
-        apps = self.app_chunks[index]
-        tokens = self.token_chunks[index]
-        labels = self.label_chunks[index]
+        # ensure index is a plain integer for numpy
+        if torch.is_tensor(index):
+            index = index.item()
+        index = int(index)
+
+        eeg = self.eeg_chunks_split[index]
+        bp = self.bp_chunks_split[index]
+        apps = self.app_chunks_split[index]
+        tokens = self.token_chunks_split[index]
+        labels = self.label_chunks_split[index]
 
         label = np.bincount(labels).argmax()
 
@@ -544,7 +551,7 @@ class TemporalDataset(Dataset):
     def get_sampler_weights(self) -> tuple[list[float], torch.Tensor]:
         # self.label_chunks is (N, seq_len). we want the label that defines the
         # chunk. find the majority label of the sequence (the mode).
-        chunk_labels = np.array([np.bincount(c).argmax() for c in self.label_chunks])
+        chunk_labels = np.array([np.bincount(c).argmax() for c in self.label_chunks_split])
 
         # force a fixed class count length so absent classes are handled safely.
         num_classes = 4

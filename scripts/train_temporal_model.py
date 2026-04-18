@@ -45,14 +45,16 @@ train_dataset = TemporalDataset(
     mode="train", seq_len=sequence_length, stride=stride, device=device, verbose=True
 )
 
-weights, class_weights = train_dataset.get_sampler_weights()
+sample_weights, class_weights = train_dataset.get_sampler_weights()
 
-sampler = WeightedRandomSampler(
-    weights=weights, num_samples=len(weights), replacement=True
+sampler = torch.utils.data.WeightedRandomSampler(
+    weights=sample_weights,
+    num_samples=len(sample_weights),
+    replacement=True  # important for oversampling minority classes
 )
 
 train_loader = DataLoader(
-    train_dataset, batch_size=batch_size, sampler=sampler, drop_last=True, shuffle=True
+    train_dataset, batch_size=batch_size, sampler=sampler, drop_last=True
 )
 
 loss_fn = nn.CrossEntropyLoss(weight=class_weights.to(device))
