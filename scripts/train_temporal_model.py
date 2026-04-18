@@ -52,7 +52,7 @@ sampler = WeightedRandomSampler(
 )
 
 train_loader = DataLoader(
-    train_dataset, batch_size=batch_size, sampler=sampler, drop_last=True
+    train_dataset, batch_size=batch_size, sampler=sampler, drop_last=True, shuffle=True
 )
 
 loss_fn = nn.CrossEntropyLoss(weight=class_weights.to(device))
