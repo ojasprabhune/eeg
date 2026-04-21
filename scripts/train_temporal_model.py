@@ -87,12 +87,12 @@ def warmup_cosine_lr(step: int) -> float:
 optimizer = torch.optim.AdamW(model.parameters(), lr=base_lr, weight_decay=0.01)
 scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, warmup_cosine_lr)
 
-# if use_ckpt_path is not None:
-#     checkpoint = torch.load(use_ckpt_path, map_location=device)
-#     model.load_state_dict(checkpoint["model"])
-#     optimizer.load_state_dict(checkpoint["optimizer"])
-#     scheduler.last_epoch = checkpoint["epochs"] * len(train_loader)
-#     print(f"Loaded model from checkpoint: {use_ckpt_path}")
+if use_ckpt_path is not None:
+    checkpoint = torch.load(use_ckpt_path, map_location=device)
+    model.load_state_dict(checkpoint["model"])
+    optimizer.load_state_dict(checkpoint["optimizer"])
+    scheduler.last_epoch = checkpoint["epochs"] * len(train_loader)
+    print(f"Loaded model from checkpoint: {use_ckpt_path}")
 
 
 def train():
