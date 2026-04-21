@@ -54,7 +54,7 @@ sampler = torch.utils.data.WeightedRandomSampler(
 )
 
 train_loader = DataLoader(
-    train_dataset, batch_size=batch_size, sampler=sampler, drop_last=True
+    train_dataset, batch_size=batch_size, sampler=sampler
 )
 
 loss_fn = nn.CrossEntropyLoss(weight=class_weights.to(device))
@@ -86,6 +86,13 @@ def warmup_cosine_lr(step: int) -> float:
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=base_lr, weight_decay=0.01)
 scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, warmup_cosine_lr)
+
+# if use_ckpt_path is not None:
+#     checkpoint = torch.load(use_ckpt_path, map_location=device)
+#     model.load_state_dict(checkpoint["model"])
+#     optimizer.load_state_dict(checkpoint["optimizer"])
+#     scheduler.last_epoch = checkpoint["epochs"] * len(train_loader)
+#     print(f"Loaded model from checkpoint: {use_ckpt_path}")
 
 
 def train():

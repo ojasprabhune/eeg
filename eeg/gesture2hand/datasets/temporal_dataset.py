@@ -453,7 +453,7 @@ class TemporalDataset(Dataset):
 
             # add all chunk indicies in this block
             split_idx.extend(range(start, end))
-        split_idx = np.array(split_idx)
+        split_idx = np.array(split_idx, dtype=np.int64)
 
         print(f"{Colors.OKBLUE}Splitting data into train and val sets...{Colors.ENDC}\n")
 
