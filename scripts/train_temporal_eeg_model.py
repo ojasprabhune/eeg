@@ -15,7 +15,7 @@ from tqdm import tqdm
 import wandb
 from eeg.gesture2hand import TemporalDataset, TemporalModel
 
-with open("config/temporal.yaml", "r") as config_file:
+with open("config/temporal_eeg.yaml", "r") as config_file:
     config = yaml.safe_load(config_file)
 
     stride = config["stride"]
@@ -42,12 +42,13 @@ with open("config/temporal.yaml", "r") as config_file:
 # --- dataset & loss function ---
 
 train_dataset = TemporalDataset(
+    vqvae_path="/Users/ojasprabhune/Documents/research/ckpts/vqvae_final_1250.pth",
     mode="train",
     seq_len=sequence_length,
     stride=stride,
     device=device,
     verbose=True,
-    data_mode="bp",
+    data_mode="eeg",
 )
 
 sample_weights, class_weights = train_dataset.get_sampler_weights()
@@ -123,10 +124,15 @@ def train():
         for eeg, bp, apps, tokens, labels, durations, masks in iter_tqdm:
             # chunk: (B, T, C)
 
-            bp = bp.to(device)
+            eeg = eeg.to(device)
             labels = labels.to(device)
 
-            label_logits = model(bp)  # out: (B, vocab_size)
+            print(f"EEG shape: {eeg.shape}, Labels shape: {labels.shape}")
+
+            label_logits = model(eeg)  # out: (B, seq_len, vocab_size)
+
+            print(f"Label logits shape: {label_logits.shape}")
+            quit()
 
             loss = loss_fn(label_logits, labels)
 

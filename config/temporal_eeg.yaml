@@ -1,0 +1,26 @@
+# temporal model
+
+stride: 15
+val_ratio: 0.2
+num_features: 14
+d_model: 128 # 64
+num_heads: 8 # 4
+num_layers: 4 # 2
+dropout: 0.3
+vocab_size: 4
+
+# training
+
+device: cpu
+batch_size: 32
+seq_length: 90
+warmup_steps: 2000
+base_lr: 1e-4
+epochs: 500 # 250
+
+run_name: temporal_no_sampler
+# use_ckpt_path: /var/log/thavamount/eeg_ckpts/eeg_lm/eeg_llm.pth
+use_ckpt_path: None
+# save_ckpt_path: /var/log/thavamount/eeg_ckpts/temporal/sampler/sampler_big
+save_ckpt_path: ~/Documents/research/ckpts/temporal_eeg
+save_every: 50 # 20

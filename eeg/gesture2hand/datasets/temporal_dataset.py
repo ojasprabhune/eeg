@@ -159,6 +159,7 @@ class TemporalDataset(Dataset):
         stride: int = 15,
         device: str = "cpu",
         mode: str = "train",
+        data_mode: str = "bp",
         val_ratio: float = 0.2,
         verbose: bool = False,
     ) -> None:
@@ -172,6 +173,7 @@ class TemporalDataset(Dataset):
         self.seq_len = seq_len
         self.stride = stride
         self.device = device
+        self.data_mode = data_mode
 
         super().__init__()
 
@@ -385,9 +387,11 @@ class TemporalDataset(Dataset):
         block_labels = []
         for b in range(n_blocks):
             # extract all labels for all chunks belonging to this block
-            block_data = self.label_chunks[b * chunks_per_block : (b + 1) * chunks_per_block].flatten()
+            block_data = self.label_chunks[
+                b * chunks_per_block : (b + 1) * chunks_per_block
+            ].flatten()
             # node of labels in the block
-            block_labels.append(int(np.bincount(block_data).argmax())) # (n_blocks,)
+            block_labels.append(int(np.bincount(block_data).argmax()))  # (n_blocks,)
         block_labels = np.array(block_labels)
 
         if verbose:
@@ -455,7 +459,9 @@ class TemporalDataset(Dataset):
             split_idx.extend(range(start, end))
         split_idx = np.array(split_idx, dtype=np.int64)
 
-        print(f"{Colors.OKBLUE}Splitting data into train and val sets...{Colors.ENDC}\n")
+        print(
+            f"{Colors.OKBLUE}Splitting data into train and val sets...{Colors.ENDC}\n"
+        )
 
         # these chunks are of shape (num_chunks, seq_len, feature_dim) for eeg,
         # bandpower, and appendage data, and (num_chunks, seq_len) for tokens
@@ -512,7 +518,9 @@ class TemporalDataset(Dataset):
         tokens = self.token_chunks_split[index]
         labels = self.label_chunks_split[index]
 
-        label = np.bincount(labels).argmax()
+        if self.data_mode == "bp":
+            # for the label of the chunk, find mode of the labels in the chunk
+            labels = np.bincount(labels).argmax()  # (1,)
 
         # vqvae_tokens: (T,)
         reversed_tokens = tokens[::-1]
@@ -543,7 +551,7 @@ class TemporalDataset(Dataset):
             torch.tensor(bp),
             torch.tensor(apps),
             torch.tensor(tokens),
-            torch.tensor(label),
+            torch.tensor(labels),
             torch.tensor(durations),
             torch.tensor(masks),
         )
@@ -551,7 +559,9 @@ class TemporalDataset(Dataset):
     def get_sampler_weights(self) -> tuple[list[float], torch.Tensor]:
         # self.label_chunks is (N, seq_len). we want the label that defines the
         # chunk. find the majority label of the sequence (the mode).
-        chunk_labels = np.array([np.bincount(c).argmax() for c in self.label_chunks_split])
+        chunk_labels = np.array(
+            [np.bincount(c).argmax() for c in self.label_chunks_split]
+        )
 
         # force a fixed class count length so absent classes are handled safely.
         num_classes = 4
@@ -563,7 +573,9 @@ class TemporalDataset(Dataset):
         weights_per_class = total_samples / (num_classes * (class_counts + 1e-8))
 
         # assign the specific weight to every individual sample
-        sample_weights = [float(weights_per_class[int(label)]) for label in chunk_labels]
+        sample_weights = [
+            float(weights_per_class[int(label)]) for label in chunk_labels
+        ]
 
         # for CrossEntropyLoss we need a fixed-length weight tensor
         class_weights_tensor = torch.tensor(weights_per_class, dtype=torch.float32)
