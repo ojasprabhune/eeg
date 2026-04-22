@@ -518,9 +518,7 @@ class TemporalDataset(Dataset):
         tokens = self.token_chunks_split[index]
         labels = self.label_chunks_split[index]
 
-        if self.data_mode == "bp":
-            # for the label of the chunk, find mode of the labels in the chunk
-            labels = np.bincount(labels).argmax()  # (1,)
+        chunk_label = np.bincount(labels).argmax()
 
         # vqvae_tokens: (T,)
         reversed_tokens = tokens[::-1]
@@ -551,7 +549,7 @@ class TemporalDataset(Dataset):
             torch.tensor(bp),
             torch.tensor(apps),
             torch.tensor(tokens),
-            torch.tensor(labels),
+            torch.tensor(chunk_label),
             torch.tensor(durations),
             torch.tensor(masks),
         )
