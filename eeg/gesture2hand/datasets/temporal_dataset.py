@@ -38,7 +38,6 @@ def compute_bandpower_features(
     features : np.ndarray, shape (T_out, 84)
         14 channels × 6 features (theta, mu, beta, low_gamma, mu/beta, total).
 
-    TODO calculate z-score stats on training data only for research paper
     """
     T, C = eeg_128hz.shape
     nperseg = int(window_sec * sfreq)  # number of samples in a window
@@ -54,7 +53,6 @@ def compute_bandpower_features(
 
     # pre-compute frequency masks for FFT bins of shape (nperseg//2 + 1,)
     freqs = np.fft.rfftfreq(nperseg, d=1.0 / sfreq)
-    print(f"Number of frequencies: {freqs.shape}")
 
     # dictionary of boolean masks that says True for those frequencies that fall
     # into a band. the mask for each band has shape (nperseg//2 + 1,) and can be
@@ -243,21 +241,17 @@ class TemporalDataset(Dataset):
         print(
             f"{Colors.OKBLUE}Computing bandpower features at {self.sfreq_native} Hz...{Colors.ENDC}"
         )
+        step_samples_128 = 4
         self.bandpower_features_raw = compute_bandpower_features(
             eeg_128hz,
             sfreq=self.sfreq_native,
             window_sec=1.0,
-            step_samples_128=4,  # ≈ 32 Hz output
+            step_samples_128=step_samples_128,  # ≈ 32 Hz output
         )
-        # Z-score bandpower features
-        bp_mean = self.bandpower_features_raw.mean(axis=0, keepdims=True)
-        bp_std = self.bandpower_features_raw.std(axis=0, keepdims=True) + 1e-8
-        self.bandpower_features = (
-            (self.bandpower_features_raw - bp_mean) / bp_std
-        ).astype(np.float32)
 
         print(
-            f"{Colors.OKGREEN}Bandpower features shape: {self.bandpower_features.shape} or (T, 84){Colors.ENDC}"
+            f"{Colors.OKGREEN}Bandpower features shape (32 Hz): "
+            f"{self.bandpower_features_raw.shape}{Colors.ENDC}"
         )
 
         # --- 30 Hz branch: raw EEG filtering ---------------------------------
@@ -279,7 +273,7 @@ class TemporalDataset(Dataset):
         for path in sorted(Path(f"{hand_data_path}").rglob("*labels_cut.npy")):
             self.label_files.append(np.load(path))
 
-        self.labels = np.concatenate(self.label_files, axis=0) - 1
+        self.labels = (np.concatenate(self.label_files, axis=0) - 1).astype(np.int64)
 
         # --- appendages + regions --------------------------------------------
 
@@ -296,15 +290,40 @@ class TemporalDataset(Dataset):
         print(f"{Colors.OKGREEN}Retrieved appendage data.{Colors.ENDC}")
         print(f"{Colors.OKGREEN}Successful retrieved all data.{Colors.ENDC}")
 
-        # --- align bandpower features with hand data -------------------------
+        # --- align bandpower to 30 Hz time grid (interpolation) --------------
 
-        min_len = min(
-            len(self.bandpower_features), len(self.app_data), len(self.eeg_data)
+        bp_rate = self.sfreq_native / step_samples_128  # 32 Hz
+        window_sec = 1.0
+        nperseg = int(window_sec * self.sfreq_native)
+        bp_offset = (nperseg // 2) / self.sfreq_native
+        bp_times = bp_offset + np.arange(len(self.bandpower_features_raw)) / bp_rate
+
+        target_sfreq = filtered_30.info["sfreq"]
+        target_len = min(len(self.eeg_data), len(self.app_data), len(self.labels))
+        target_times = np.arange(target_len) / target_sfreq
+
+        valid = target_times <= bp_times[-1]
+        target_times = target_times[valid]
+        target_len = len(target_times)
+
+        bp_aligned = np.zeros(
+            (target_len, self.bandpower_features_raw.shape[1]), dtype=np.float32
         )
-        self.bandpower_features = self.bandpower_features[:min_len]
-        self.app_data = self.app_data[:min_len]
-        self.eeg_data = self.eeg_data[:min_len]
-        self.labels = self.labels[:min_len]
+        for f in range(self.bandpower_features_raw.shape[1]):
+            bp_aligned[:, f] = np.interp(
+                target_times, bp_times, self.bandpower_features_raw[:, f]
+            )
+
+        self.bandpower_features = bp_aligned
+        self.eeg_data = self.eeg_data[:target_len]
+        self.app_data = self.app_data[:target_len]
+        self.labels = self.labels[:target_len]
+        min_len = target_len
+
+        print(
+            f"{Colors.OKGREEN}Aligned all streams to {target_sfreq:.2f} Hz, "
+            f"{min_len} samples{Colors.ENDC}"
+        )
 
         # - vq-vae pre-computing -
         print(f"{Colors.OKBLUE}Pre-computing VQ-VAE tokens...{Colors.ENDC}")
@@ -354,118 +373,70 @@ class TemporalDataset(Dataset):
         self.token_chunks = np.array(all_tokens, dtype=np.int64)
         self.label_chunks = np.array(all_labels, dtype=np.int64)
 
-        # --- train-val split -------------------------------------------------
+        # --- train-val split (large contiguous blocks, no leakage) ----------
 
-        # total number of chunks we have created from the data
         n_chunks = len(self.bp_chunks)
+        block_size_samples = 9000  # ~5 min at 30 Hz
+        n_blocks = min_len // block_size_samples
 
-        # determine how many smaller chunks fit into one sequence block.
-        # seq_len // stride ≈ how many steps per sequence, and max(1, ...)
-        # ensure at least 1 chunk per block
-        chunks_per_block = max(1, self.seq_len // self.stride)
-
-        # total number of bandpower chunks available. each chunk = one
-        # timestep (or small window)
-        n_blocks = n_chunks // chunks_per_block
-
-        if verbose:
-            print(Colors.HEADER)
-            print("EEG chunks (30Hz):   ", self.eeg_data.shape)
-            print("Bandpower chunks:    ", self.bandpower_features.shape)
-            print("Appendages chunks:   ", self.app_data.shape)
-            print("VQ-VAE tokens chunks:", self.vqvae_tokens_all.shape)
-            print("Labels chunks:       ", self.labels.shape)
-            print(Colors.ENDC)
-
-        # select all labels inside block b and compute the most common label
-        # value in that block. this is a more general approach that works
-        # for multi-class labels, where we take the mode (most frequent
-        # label) instead of the mean. the argmax of the bincount gives us
-        # the most common label in that block, and we convert it to an
-        # integer. this way we can assign a single label to each block based
-        # on the majority class
         block_labels = []
         for b in range(n_blocks):
-            # extract all labels for all chunks belonging to this block
-            block_data = self.label_chunks[
-                b * chunks_per_block : (b + 1) * chunks_per_block
-            ].flatten()
-            # node of labels in the block
-            block_labels.append(int(np.bincount(block_data).argmax()))  # (n_blocks,)
+            s = b * block_size_samples
+            e = s + block_size_samples
+            block_labels.append(int(np.bincount(self.labels[s:e]).argmax()))
         block_labels = np.array(block_labels)
 
-        if verbose:
-            print("Number of blocks:", block_labels.shape, "\n")
-
         rng = np.random.RandomState(42)
+        block_assignment = np.full(n_blocks, -1, dtype=np.int8)
+        for cls in range(4):
+            cls_ids = np.where(block_labels == cls)[0]
+            rng.shuffle(cls_ids)
+            n_val = max(1, int(len(cls_ids) * val_ratio))
+            block_assignment[cls_ids[:n_val]] = 1  # val
+            block_assignment[cls_ids[n_val:]] = 0  # train
 
-        # block_labels is shape (n_blocks,). block_labels == 1 -> boolean array
-        # of same shape. np.where gives us the indices of the blocks that belong
-        # to each class. [0] is to get the indices from the tuple output of
-        # np.where
-        fist_block_ids = np.where(block_labels == 0)[0]
-        left_block_ids = np.where(block_labels == 1)[0]
-        fingers_block_ids = np.where(block_labels == 2)[0]
-        open_block_ids = np.where(block_labels == 3)[0]
+        sample_assignment = np.full(min_len, -1, dtype=np.int8)
+        for b in range(n_blocks):
+            s = b * block_size_samples
+            e = s + block_size_samples
+            sample_assignment[s:e] = block_assignment[b]
 
-        # randomly shuffle each class separately. preserve class balance before
-        # splitting
-        rng.shuffle(fist_block_ids)
-        rng.shuffle(left_block_ids)
-        rng.shuffle(fingers_block_ids)
-        rng.shuffle(open_block_ids)
+        train_idx, val_idx = [], []
+        for chunk_i, start in enumerate(
+            range(0, min_len - seq_len + 1, stride)
+        ):
+            assignments = sample_assignment[start : start + seq_len]
+            if (assignments == 0).all():
+                train_idx.append(chunk_i)
+            elif (assignments == 1).all():
+                val_idx.append(chunk_i)
 
-        # calculate class-specific split points
-        def get_split(ids):
-            split = max(1, int(len(ids) * val_ratio))
-            return ids[:split], ids[split:]
+        train_idx = np.array(train_idx, dtype=np.int64)
+        val_idx = np.array(val_idx, dtype=np.int64)
 
-        # determine how many blocks to allocate to the validation set for each
-        v_fist, t_fist = get_split(fist_block_ids)
-        v_left, t_left = get_split(left_block_ids)
-        v_finger, t_finger = get_split(fingers_block_ids)
-        v_open, t_open = get_split(open_block_ids)
+        # --- Z-score bandpower (train stats only) ---------------------------
 
-        # concatenate the validation blocks from each class to form the complete
-        # validation set, and the remaining blocks form the training set. this
-        # way we ensure that the validation set has a representative sample of
-        # each class, and we can evaluate our model's performance on a balanced
-        # subset of the data
-        val_block_ids = np.concatenate([v_fist, v_left, v_finger, v_open])
-        train_block_ids = np.concatenate([t_fist, t_left, t_finger, t_open])
+        train_bp_flat = self.bp_chunks[train_idx].reshape(-1, 84)
+        self.bp_mean = train_bp_flat.mean(axis=0, keepdims=True)
+        self.bp_std = train_bp_flat.std(axis=0, keepdims=True) + 1e-8
 
-        # filter data based on mode
+        self.bp_chunks = (
+            (self.bp_chunks.reshape(-1, 84) - self.bp_mean) / self.bp_std
+        ).reshape(self.bp_chunks.shape).astype(np.float32)
+
+        # --- select split ---------------------------------------------------
+
         if mode == "train":
-            target_block_ids = train_block_ids
+            split_idx = train_idx
         else:
-            target_block_ids = val_block_ids
+            split_idx = val_idx
 
-        # function to convert block indices to chunk indices. for each block
-        # index, we calculate the start and end chunk indices that
-        # correspond to that block, and we extend the list of chunk indices with
-        # the range of chunk indices for that block. this way we can easily
-        # select the chunks that belong to the training and validation sets
-        # based on the block indices we determined earlier
-
-        split_idx = []
-        for b in target_block_ids:
-            start = b * chunks_per_block  # first chunk index for block b
-
-            # last chunk index (exclusive). min prevents overflow at
-            # dataset end
-            end = min(start + chunks_per_block, n_chunks)
-
-            # add all chunk indicies in this block
-            split_idx.extend(range(start, end))
-        split_idx = np.array(split_idx, dtype=np.int64)
-
+        n_discarded = n_chunks - len(train_idx) - len(val_idx)
         print(
-            f"{Colors.OKBLUE}Splitting data into train and val sets...{Colors.ENDC}\n"
+            f"{Colors.OKBLUE}Split: {len(train_idx)} train, "
+            f"{len(val_idx)} val, "
+            f"{n_discarded} discarded (boundary){Colors.ENDC}\n"
         )
-
-        # these chunks are of shape (num_chunks, seq_len, feature_dim) for eeg,
-        # bandpower, and appendage data, and (num_chunks, seq_len) for tokens
-        # and labels
 
         self.eeg_chunks_split = self.eeg_chunks[split_idx]
         self.bp_chunks_split = self.bp_chunks[split_idx]
@@ -474,19 +445,13 @@ class TemporalDataset(Dataset):
         self.label_chunks_split = self.label_chunks[split_idx]
 
         if verbose:
-            fist_pct = (self.label_chunks_split == 0).mean()
-            left_pct = (self.label_chunks_split == 1).mean()
-            fingers_pct = (self.label_chunks_split == 2).mean()
-            open_pct = (self.label_chunks_split == 3).mean()
-
-            print(
-                f"{Colors.WARNING}Total number of chunks: {self.__len__()}{Colors.ENDC}\n"
+            chunk_labels = np.array(
+                [np.bincount(c).argmax() for c in self.label_chunks_split]
             )
-            print(f"Training/validation split index: {len(split_idx)}\n")
-            print(f"Fist chunks ({fist_pct:.1%} open)")
-            print(f"Left chunks ({left_pct:.1%} open)")
-            print(f"Fingers chunks ({fingers_pct:.1%} open)")
-            print(f"Open chunks ({open_pct:.1%} open)\n")
+            for cls, name in enumerate(["Fist", "Left", "Fingers", "Open"]):
+                pct = (chunk_labels == cls).mean()
+                print(f"{name} chunks: {pct:.1%}")
+            print()
 
     def __len__(self) -> int:
         return len(self.bp_chunks_split)
