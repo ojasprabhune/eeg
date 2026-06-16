@@ -19,8 +19,6 @@ base_lr: 1e-4
 epochs: 500 # 250
 
 run_name: temporal_no_sampler
-# use_ckpt_path: /var/log/thavamount/eeg_ckpts/eeg_lm/eeg_llm.pth
 use_ckpt_path: None
-# save_ckpt_path: /var/log/thavamount/eeg_ckpts/temporal/sampler/sampler_big
-save_ckpt_path: ~/Documents/research/ckpts/temporal_eeg
+save_ckpt_path: /var/log/thavamount/eeg_ckpts/temporal/eeg/eeg
 save_every: 50 # 20

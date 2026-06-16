@@ -42,7 +42,6 @@ with open("config/temporal_eeg.yaml", "r") as config_file:
 # --- dataset & loss function ---
 
 train_dataset = TemporalDataset(
-    vqvae_path="/Users/ojasprabhune/Documents/research/ckpts/vqvae_final_1250.pth",
     mode="train",
     seq_len=sequence_length,
     stride=stride,
@@ -127,12 +126,7 @@ def train():
             eeg = eeg.to(device)
             labels = labels.to(device)
 
-            print(f"EEG shape: {eeg.shape}, Labels shape: {labels.shape}")
-
             label_logits = model(eeg)  # out: (B, seq_len, vocab_size)
-
-            print(f"Label logits shape: {label_logits.shape}")
-            quit()
 
             loss = loss_fn(label_logits, labels)
 
