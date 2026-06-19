@@ -1,0 +1,23 @@
+# linear baseline model (bandpower -> classification)
+
+stride: 30
+val_ratio: 0.2
+num_features: 84
+num_classes: 4 # set to 3 and exclude_open: true for 3-class
+exclude_open: false # if true, drops class 3 (Open) and remaps to 0-2
+dropout: 0.3
+
+# training
+
+device: cuda
+batch_size: 32
+seq_length: 120
+warmup_steps: 500
+base_lr: 1e-3
+epochs: 75
+weight_decay: 0.01
+
+run_name: linear_baseline_4class
+use_ckpt_path: null
+save_ckpt_path: /var/log/thavamount/eeg_ckpts/linear_baseline/linear_baseline
+save_every: 25
