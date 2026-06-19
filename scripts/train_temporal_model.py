@@ -26,6 +26,7 @@ with open("config/temporal.yaml", "r") as config_file:
     num_layers = config["num_layers"]
     dropout = config["dropout"]
     vocab_size = config["vocab_size"]
+    train_fraction = config.get("train_fraction", 1.0)
 
     device = config["device"]
     batch_size = config["batch_size"]
@@ -48,6 +49,16 @@ train_dataset = TemporalDataset(
     device=device,
     verbose=True,
     data_mode="bp",
+    train_fraction=train_fraction,
+)
+
+val_dataset = TemporalDataset(
+    mode="val",
+    seq_len=sequence_length,
+    stride=stride,
+    device=device,
+    verbose=True,
+    data_mode="bp",
 )
 
 sample_weights, class_weights = train_dataset.get_sampler_weights()
@@ -59,6 +70,7 @@ sampler = torch.utils.data.WeightedRandomSampler(
 )
 
 train_loader = DataLoader(train_dataset, batch_size=batch_size, sampler=sampler)
+val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
 loss_fn = nn.CrossEntropyLoss(weight=class_weights.to(device))
 
@@ -97,6 +109,49 @@ if use_ckpt_path is not None:
     scheduler.last_epoch = checkpoint["epochs"] * len(train_loader)
     print(f"Loaded model from checkpoint: {use_ckpt_path}")
 
+# --- validation ---
+
+def compute_f1(all_preds: torch.Tensor, all_labels: torch.Tensor, nc: int) -> float:
+    """Compute macro F1 score."""
+    f1s = []
+    for cls in range(nc):
+        tp = ((all_preds == cls) & (all_labels == cls)).sum().item()
+        fp = ((all_preds == cls) & (all_labels != cls)).sum().item()
+        fn = ((all_preds != cls) & (all_labels == cls)).sum().item()
+        prec = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        rec = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        f1 = 2 * prec * rec / (prec + rec) if (prec + rec) > 0 else 0.0
+        f1s.append(f1)
+    return sum(f1s) / len(f1s) if len(f1s) > 0 else 0.0
+
+def validate() -> tuple[float, float, float]:
+    model.eval()
+    total_loss = 0.0
+    correct = 0
+    total = 0
+    all_preds = []
+    all_labels = []
+
+    with torch.no_grad():
+        for eeg, bp, apps, tokens, labels, durations, masks in val_loader:
+            bp = bp.to(device)
+            labels = labels.to(device)
+            logits = model(bp)
+            loss = loss_fn(logits, labels)
+            
+            total_loss += loss.item() * bp.size(0)
+            preds = logits.argmax(dim=1)
+            correct += (preds == labels).sum().item()
+            total += labels.size(0)
+            all_preds.append(preds.cpu())
+            all_labels.append(labels.cpu())
+
+    model.train()
+    avg_loss = total_loss / max(total, 1)
+    accuracy = correct / max(total, 1)
+    f1 = compute_f1(torch.cat(all_preds), torch.cat(all_labels), vocab_size)
+    return avg_loss, accuracy, f1
+
 
 def train():
     run = wandb.init(
@@ -108,6 +163,7 @@ def train():
             "architecture": "TransformerEncoder",
             "dataset": "temporal_dataset",
             "epochs": epochs,
+            "train_fraction": train_fraction,
         },
     )
 
@@ -137,6 +193,11 @@ def train():
             loss.backward()  # calculates and adds gradients to params so optim sees
             optimizer.step()  # optim looks at gradients and steps accordingly
             scheduler.step()  # steps lr
+
+        # --- end-of-epoch validation ---
+        val_loss, val_acc, val_f1 = validate()
+        run.log({"val_loss": val_loss, "val_acc": val_acc, "val_f1": val_f1, "epoch": i + 1})
+        epoch_tqdm.set_postfix({"val_loss": f"{val_loss:.4f}", "val_acc": f"{val_acc:.3f}", "val_f1": f"{val_f1:.3f}"})
 
         if (i + 1) % save_every == 0:
             latest_ckpt = {

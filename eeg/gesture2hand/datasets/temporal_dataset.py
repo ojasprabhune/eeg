@@ -159,6 +159,7 @@ class TemporalDataset(Dataset):
         mode: str = "train",
         data_mode: str = "bp",
         val_ratio: float = 0.2,
+        train_fraction: float = 1.0,
         verbose: bool = False,
     ) -> None:
         """
@@ -423,6 +424,28 @@ class TemporalDataset(Dataset):
             .reshape(self.bp_chunks.shape)
             .astype(np.float32)
         )
+
+        # --- subsample training data for scaling experiments ----------------
+
+        if train_fraction < 1.0:
+            rng_sub = np.random.RandomState(123)
+            chunk_labels_train = np.array(
+                [
+                    np.bincount(self.label_chunks[i], minlength=4).argmax()
+                    for i in train_idx
+                ]
+            )
+            keep_indices = []
+            for cls in range(4):
+                cls_indices = np.where(chunk_labels_train == cls)[0]
+                n_keep = max(1, int(len(cls_indices) * train_fraction))
+                rng_sub.shuffle(cls_indices)
+                keep_indices.extend(train_idx[cls_indices[:n_keep]])
+            train_idx = np.sort(np.array(keep_indices, dtype=np.int64))
+            print(
+                f"{Colors.WARNING}Scaling: using {train_fraction:.0%} of training data "
+                f"({len(train_idx)} chunks){Colors.ENDC}"
+            )
 
         # --- select split ---------------------------------------------------
 

@@ -31,6 +31,7 @@ with open("config/linear_temporal.yaml", "r") as config_file:
     num_features = config["num_features"]
     num_classes = config["num_classes"]
     exclude_open = config["exclude_open"]
+    train_fraction = config.get("train_fraction", 1.0)
     dropout = config["dropout"]
 
     device = config["device"]
@@ -55,6 +56,7 @@ train_dataset = TemporalDataset(
     device=device,
     verbose=True,
     data_mode="bp",
+    train_fraction=train_fraction,
 )
 
 val_dataset = TemporalDataset(
@@ -148,12 +150,28 @@ if use_ckpt_path is not None:
 # --- validation ---
 
 
-def validate() -> tuple[float, float]:
-    """Run one pass over the validation set, return (loss, accuracy)."""
+def compute_f1(all_preds: torch.Tensor, all_labels: torch.Tensor, nc: int) -> float:
+    """Compute macro F1 score (no sklearn needed)."""
+    f1s = []
+    for cls in range(nc):
+        tp = ((all_preds == cls) & (all_labels == cls)).sum().item()
+        fp = ((all_preds == cls) & (all_labels != cls)).sum().item()
+        fn = ((all_preds != cls) & (all_labels == cls)).sum().item()
+        prec = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        rec = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        f1 = 2 * prec * rec / (prec + rec) if (prec + rec) > 0 else 0.0
+        f1s.append(f1)
+    return sum(f1s) / len(f1s)
+
+
+def validate() -> tuple[float, float, float]:
+    """Run one pass over the validation set, return (loss, accuracy, macro_f1)."""
     model.eval()
     total_loss = 0.0
     correct = 0
     total = 0
+    all_preds = []
+    all_labels = []
 
     with torch.no_grad():
         for eeg, bp, apps, tokens, labels, durations, masks in val_loader:
@@ -167,11 +185,14 @@ def validate() -> tuple[float, float]:
             preds = logits.argmax(dim=1)
             correct += (preds == labels).sum().item()
             total += labels.size(0)
+            all_preds.append(preds.cpu())
+            all_labels.append(labels.cpu())
 
     model.train()
     avg_loss = total_loss / max(total, 1)
     accuracy = correct / max(total, 1)
-    return avg_loss, accuracy
+    f1 = compute_f1(torch.cat(all_preds), torch.cat(all_labels), num_classes)
+    return avg_loss, accuracy, f1
 
 
 # --- training ---
@@ -189,6 +210,7 @@ def train():
             "epochs": epochs,
             "num_classes": num_classes,
             "exclude_open": exclude_open,
+            "train_fraction": train_fraction,
         },
     )
 
@@ -220,9 +242,9 @@ def train():
             scheduler.step()
 
         # --- end-of-epoch validation ---
-        val_loss, val_acc = validate()
-        run.log({"val_loss": val_loss, "val_acc": val_acc, "epoch": i + 1})
-        epoch_tqdm.set_postfix({"val_loss": f"{val_loss:.4f}", "val_acc": f"{val_acc:.3f}"})
+        val_loss, val_acc, val_f1 = validate()
+        run.log({"val_loss": val_loss, "val_acc": val_acc, "val_f1": val_f1, "epoch": i + 1})
+        epoch_tqdm.set_postfix({"val_loss": f"{val_loss:.4f}", "val_acc": f"{val_acc:.3f}", "val_f1": f"{val_f1:.3f}"})
 
         if (i + 1) % save_every == 0:
             latest_ckpt = {
