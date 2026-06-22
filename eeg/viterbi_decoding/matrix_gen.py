@@ -52,10 +52,12 @@ def get_viterbi_matrices(
     counts = np.ones((len(alphabet), len(alphabet)))  # add-1 (laplace) smoothing
 
     # increase count per bigram
-    for word in sentence_words:
-        for i in range(len(word) - 1):
-            letter1 = alphabet.index(word[i])
-            letter2 = alphabet.index(word[i + 1])
+    for sentence in sentences_of_words:
+        # recreate the continuous rentence string Viterbi will actually see
+        continuous_sentence = "".join(sentence)
+        for i in range(len(continuous_sentence) - 1):
+            letter1 = alphabet.index(continuous_sentence[i])
+            letter2 = alphabet.index(continuous_sentence[i + 1])
             counts[letter1, letter2] += 1
 
     # normalize rows

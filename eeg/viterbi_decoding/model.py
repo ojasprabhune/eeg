@@ -60,12 +60,14 @@ class Viterbi:
 
         # --- initial scores ---
 
+        # add logs because probability approaches 0
         scores = np.array(
             [
-                self.initial_state[i] * self.emission_matrix[i, observations[0]]
+                np.log(self.initial_state[i] + 1e-10)
+                + np.log(self.emission_matrix[i, observations[0]] + 1e-10)
                 for i in range(self.N)
             ]
-        )  # (N,)
+        )
 
         # --- moving forward in time ---
         sequence_scores = [list(scores)]  # will be (T, N)
@@ -79,11 +81,12 @@ class Viterbi:
                 path_scores = []
 
                 for j in range(self.N):  # loop through each past state
+                    # add log because probability approachs 0
                     score = scores[j]
-                    transition = self.transition_matrix[j, i]
-                    emission = self.emission_matrix[i][observations[t]]
+                    transition = np.log(self.transition_matrix[j, i] + 1e-10)
+                    emission = np.log(self.emission_matrix[i][observations[t]] + 1e-10)
 
-                    path_score = score * transition * emission
+                    path_score = score + transition + emission
                     path_scores.append(path_score)
 
                 max_score = max(path_scores)  # best path for current state
