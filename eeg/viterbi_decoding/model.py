@@ -58,10 +58,6 @@ class Viterbi:
         self.T = len(observations)
         self.observations = observations
 
-        print(self.initial_state.shape)
-        print(self.emission_matrix.shape)
-        print(self.observations.shape)
-
         # --- initial scores ---
 
         scores = np.array(
@@ -104,16 +100,16 @@ class Viterbi:
 
         # --- choosing best final path ---
 
-        print(sequence_scores.shape)
-        print(path_backpointers.shape)
+        best_last_state = int(
+            np.argmax(sequence_scores[-1, :])
+        )  # index of best final state
 
-        best_path_idx = np.argmax(sequence_scores[-1, :])  # index of best final state
-        print(path_backpointers[:, best_path_idx])
-        best_path: NDArray[np.int64] = np.array(
-            path_backpointers[:, best_path_idx], dtype=np.int64
-        )  # (T,)
+        best_path = np.empty(self.T, dtype=np.int64)
 
-        print(best_path_idx)
-        print(best_path.shape)
+        best_path[-1] = best_last_state
+
+        # start at t - 1, decrement
+        for t in range(self.T - 1, 0, -1):
+            best_path[t - 1] = path_backpointers[t, best_path[t]]
 
         return best_path

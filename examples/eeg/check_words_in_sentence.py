@@ -2,7 +2,7 @@
 Check that all words in sentences are in the word list.
 """
 
-words_file = open("eeg/viterbi_decoding/data/50words.txt", "r")
+words_file = open("eeg/viterbi_decoding/data/150words.txt", "r")
 words = words_file.readline().split(", ")
 words[-1] = words[-1].rstrip("\n")
 words = [word.lower() for word in words]

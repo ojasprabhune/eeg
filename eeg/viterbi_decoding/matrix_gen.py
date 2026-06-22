@@ -1,13 +1,13 @@
 import numpy as np
 from numpy.typing import NDArray
 
-from eeg.gesture2hand import Colors, get_gesture_class
+from eeg.gesture2hand import Colors, gesture_classes, get_gesture_class
 
 alphabet = "abcdefghijklmnopqrstuvwxyz"
 
 
 def get_viterbi_matrices(
-    word_count: int, p: float
+    num_words: int, num_sentences: int, p: float
 ) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
     """
     Returns a tuple of:
@@ -17,11 +17,10 @@ def get_viterbi_matrices(
           class
     """
 
-    if word_count not in (50, 30, 25):
-        print(
-            f"{Colors.FAIL}Warning: word_count {word_count} not valid. Defaulting to 50.{Colors.ENDC}"
+    if num_words not in (150, 50, 25, 10):
+        raise ValueError(
+            f"{Colors.FAIL}Warning: num_words {num_words} not valid. Choose between 150, 50, 25, or 10.{Colors.ENDC}"
         )
-        word_count = 50
 
     # --- initial matrix ---
     initial_state = np.array([1 / 26] * 26)
@@ -29,12 +28,14 @@ def get_viterbi_matrices(
     # --- transition matrix ---
     transition_matrix = np.array([])
 
-    words_file = open(f"eeg/viterbi_decoding/data/{word_count}words.txt", "r")
+    words_file = open(f"eeg/viterbi_decoding/data/{num_words}words.txt", "r")
     words = words_file.readline().split(", ")
     words[-1] = words[-1].rstrip("\n")
     words = [word.lower() for word in words]
 
-    sentences_file = open("eeg/viterbi_decoding/data/sentences.txt", "r")
+    sentences_file = open(
+        f"eeg/viterbi_decoding/data/{num_sentences}sentences.txt", "r"
+    )
     sentences = sentences_file.readlines()
 
     sentences_of_words = []
@@ -95,5 +96,39 @@ def make_observation_matrix(
     return obs_mat
 
 
-def sequence_to_letters(sequence: list[int]) -> str:
-    return str([alphabet[i] for i in sequence])
+def sequence_to_letters(sequence: NDArray[np.int64]) -> str:
+    return "".join(alphabet[i] for i in sequence)
+
+
+def get_sentence_data(idx: int) -> tuple[list[int], str, list[str]]:
+    """
+    Takes in an index to return a sentence from the corpus. It returns the
+    integer version of the sentence and the sentence string formatted.
+    """
+    # shift 1-4 to 0-3
+    gesture_classes_shifted = {k: v - 1 for k, v in gesture_classes.items()}
+
+    sentences_file = open("eeg/viterbi_decoding/data/150sentences.txt", "r")
+    sentences = [
+        sentence.strip().lower().rstrip(".?,!")
+        for sentence in sentences_file.readlines()
+    ]
+
+    sentence_words = sentences[idx].split(" ")
+    sentence = sentences[idx].replace(" ", "")
+    sequence = [
+        gesture_classes_shifted[c] for c in sentence if c in gesture_classes_shifted
+    ]
+
+    return sequence, sentence, sentence_words
+
+
+def reconstruct_words(pred_str: str, gt_words: list[str]) -> list[str]:
+    pred_words = []
+    idx = 0
+
+    for word in gt_words:
+        pred_words.append(pred_str[idx : idx + len(word)])
+        idx += len(word)
+
+    return pred_words
