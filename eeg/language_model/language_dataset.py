@@ -1,0 +1,102 @@
+import re
+
+import numpy as np
+import torch
+from torch.utils.data import Dataset
+
+from eeg.gesture2hand import Colors
+from eeg.viterbi_decoding import make_placeholder_feature_sequences
+
+from .tokenizer import LanguageTokenizer
+
+
+class LanguageDataset(Dataset):
+    """
+    Dataset for loading the outputs of the EEG classifier as inputs for
+    the language model.
+    """
+
+    def __init__(
+        self,
+        features_sequences: torch.Tensor,
+        label_sentence_path: str = "eeg/language_model/data/",
+        device: str = "cuda",
+        print_shapes: bool = False,
+    ) -> None:
+        """
+        Input is a list of feature sequences, each of shape (T, 4), and the
+        labels are a list. Each sequence in the features is the same max
+        sequence length as each tokenized label sequence.
+        """
+
+        print(f"{Colors.HEADER}{Colors.BOLD}Initializing dataset...{Colors.ENDC}")
+        self.print_shapes = print_shapes
+        self.device = device
+
+        super().__init__()
+
+        # --- sentences ---
+        language_tokenizer = LanguageTokenizer()
+
+        sentences_file = open(f"{label_sentence_path}150sentences.txt", "r")
+        sentences = sentences_file.readlines()
+        features, masks = make_placeholder_feature_sequences(sentences)
+
+        sentences = [re.sub(r"[^a-z]", "", sentence.lower()) for sentence in sentences]
+        labels = language_tokenizer.encode(sentences)
+
+        if print_shapes:
+            print(f"{Colors.OKGREEN}Features shape: {features.shape}{Colors.ENDC}")
+            print(f"{Colors.OKGREEN}Masks shape: {masks.shape}{Colors.ENDC}")
+            print(f"{Colors.OKGREEN}Labels shape: {labels.shape}{Colors.ENDC}")
+
+        # --- train-val split ---
+
+        # index at 80% on time dim
+        self.split_idx = int(len(features) * 0.8)
+
+        self.features = np.array(features, dtype=np.float32)
+        self.masks = np.array(masks, dtype=np.int32)
+        self.labels = np.array(labels, dtype=np.int32)
+
+        self.train_features = self.features[: self.split_idx, :, :]
+        self.train_masks = self.masks[: self.split_idx, :]
+        self.train_labels = self.labels[: self.split_idx, :]
+
+        self.val_features = self.features[self.split_idx :, :, :]
+        self.val_masks = self.masks[self.split_idx :, :]
+        self.val_labels = self.labels[self.split_idx :, :]
+
+        if print_shapes:
+            print(f"{Colors.WARNING}Total # of chunks: {self.__len__()}{Colors.ENDC}")
+
+    def __len__(self) -> int:
+        return len(self.train_features)
+
+    def __getitem__(
+        self, index: int
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        Returns the feature sequences, masks, and label sequences in the chunk
+        at the given index from the training set.
+        """
+
+        features = self.train_features[index]
+        masks = self.train_masks[index]
+        labels = self.train_labels[index]
+
+        return torch.tensor(features), torch.tensor(masks), torch.tensor(labels)
+
+    def get_val_data(
+        self, index: int
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        Returns the feature sequences, masks, and label sequences in the chunk
+        at the given index from the validation set.
+        """
+
+        features = self.val_features[index]
+        masks = self.val_masks[index]
+        labels = self.val_labels[index]
+
+        return torch.tensor(features), torch.tensor(masks), torch.tensor(labels)

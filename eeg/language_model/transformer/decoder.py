@@ -26,10 +26,14 @@ class DecoderLayer(nn.Module):
         of the same shape.
 
         The decoder layer will have three main components:
-            1. A Masked Multi-Head Attention layer
+            1. A Masked Multi-Head Attention layer (you'll need to
+               modify the MultiHeadAttention layer to handle this!)
             2. A Multi-Head Attention layer for cross-attention
                between the target and source embeddings.
             3. A Feed-Forward Neural Network layer.
+
+        Remember that for each Multi-Head Attention layer, we
+        need create Q, K, and V matrices from the input embedding(s)!
         """
         super().__init__()
 
@@ -100,9 +104,10 @@ class Decoder(nn.Module):
         dropout: float = 0.1,
     ):
         """
-        The decoder will take in a sequence of tokens AND a source
-        embedding and will output an encoded representation of
-        shape (B, T, C).
+        Remember that the decoder will take in a sequence
+        of tokens AND a source embedding
+        and will output an encoded representation
+        of shape (B, T, C).
 
         First, we need to create an embedding from the sequence
         of tokens. For this, we need the vocab size.
@@ -126,6 +131,16 @@ class Decoder(nn.Module):
         self.qk_length = qk_length
         self.value_length = value_length
 
+        # Define any layers you'll need in the forward pass
+        # Hint: You may find `ModuleList`s useful for creating
+        # multiple layers in some kind of list comprehension.
+        #
+        # Recall that the input is just a sequence of tokens,
+        # so we'll have to first create some kind of embedding
+        # and then use the other layers we've implemented to
+        # build out the Transformer decoder.
+
+        self.embedding = nn.Embedding(vocab_size, embedding_dim)
         self.decoder_layers = nn.ModuleList(
             [
                 DecoderLayer(
@@ -146,6 +161,7 @@ class Decoder(nn.Module):
         self.linear = nn.Linear(embedding_dim, vocab_size)
 
     def make_mask(self, x: torch.Tensor) -> torch.Tensor:
+        # dictionary of input embeddings
         """
         Create a mask to prevent attention to future tokens.
         """
@@ -156,18 +172,17 @@ class Decoder(nn.Module):
 
         return out
 
-    def forward(
-        self, x: torch.Tensor, enc_x: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, x: torch.Tensor, enc_x: torch.Tensor) -> torch.Tensor:
         """
         The forward pass of the Decoder.
         """
 
-        decode_mask = self.make_mask(x)
-        x = self.positional_encoding(x)
+        sequence_embedding = self.embedding(x)  # (B, T, C)
+        decode_mask = self.make_mask(sequence_embedding)
+        x = self.positional_encoding(sequence_embedding)
         x = self.dropout(x)
         for decoder_layer in self.decoder_layers:
             x = decoder_layer(x, enc_x, decode_mask)
-        vocab_distribution = self.linear(x)
+        x = self.linear(x)
 
-        return x, vocab_distribution  # (B, T, C), (B, T, vocab_size)
+        return x

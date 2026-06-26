@@ -1,3 +1,6 @@
+import random
+import re
+
 import numpy as np
 from numpy.typing import NDArray
 
@@ -88,14 +91,61 @@ def make_observation_matrix(
     seq_length = len(sequence)
     obs_mat = np.zeros((seq_length, num_classes))
 
-    for i in range(len(obs_mat)):
-        for j in range(len(obs_mat[i])):
+    for i in range(seq_length):
+        for j in range(num_classes):
             if j == sequence[i]:
                 obs_mat[i, j] = correct_mean
             else:
-                obs_mat[i, j] = (1 - correct_mean) / 3
+                obs_mat[i, j] = (1 - correct_mean) / (num_classes - 1)
 
     return obs_mat
+
+
+def make_placeholder_feature_sequences(
+    sentences: list[str],
+    num_classes: int = 4,
+    correct_mean: float = 0.8,
+) -> tuple[NDArray, NDArray]:
+    """
+    Returns:
+        features: (N, max_T, 4)
+        masks:    (N, max_T)
+
+    where:
+        masks[i, t] = 1 if timestep is real
+                      0 if timestep is padding
+    """
+
+    cleaned_sentences = [
+        re.sub(r"[^a-z]", "", sentence.lower()) for sentence in sentences
+    ]
+
+    max_len = max(len(sentence) for sentence in cleaned_sentences)
+
+    features = []
+    masks = []
+
+    for sentence in cleaned_sentences:
+        T = len(sentence)
+
+        gesture_sequence = [random.randint(1, num_classes) for _ in range(T)]
+
+        obs_mat = make_observation_matrix(
+            gesture_sequence,
+            num_classes=num_classes,
+            correct_mean=correct_mean,
+        )
+
+        padded = np.zeros((max_len, num_classes), dtype=np.float32)
+        padded[:T] = obs_mat
+
+        mask = np.zeros(max_len, dtype=np.int64)
+        mask[:T] = 1
+
+        features.append(padded)
+        masks.append(mask)
+
+    return np.stack(features), np.stack(masks)
 
 
 def sequence_to_letters(sequence: NDArray[np.int64]) -> str:

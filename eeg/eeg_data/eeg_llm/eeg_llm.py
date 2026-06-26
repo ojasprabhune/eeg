@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
-from .transformer import Encoder, Decoder
+
+from .transformer import Decoder, Encoder
+
 
 class EEGLLM(nn.Module):
     """
@@ -32,7 +34,7 @@ class EEGLLM(nn.Module):
             qk_length=qk_length,
             value_length=value_length,
             max_length=max_length,
-            dropout=dropout
+            dropout=dropout,
         )
 
         self.decoder = Decoder(
@@ -44,17 +46,14 @@ class EEGLLM(nn.Module):
             qk_length=qk_length,
             value_length=value_length,
             max_length=max_length,
-            dropout=dropout
+            dropout=dropout,
         )
 
         self.linear1 = nn.Linear(num_channels, embedding_dim)
 
-        self.duration_prediction_linear1 = nn.Linear(
-            embedding_dim, embedding_dim)
-        self.duration_prediction_linear2 = nn.Linear(
-            embedding_dim, embedding_dim)
-        self.duration_prediction_linear3 = nn.Linear(
-            embedding_dim, embedding_dim)
+        self.duration_prediction_linear1 = nn.Linear(embedding_dim, embedding_dim)
+        self.duration_prediction_linear2 = nn.Linear(embedding_dim, embedding_dim)
+        self.duration_prediction_linear3 = nn.Linear(embedding_dim, embedding_dim)
         self.duration_prediction_linear4 = nn.Linear(embedding_dim, 1)
 
         self.dropout = nn.Dropout(p=dropout)
@@ -64,13 +63,13 @@ class EEGLLM(nn.Module):
         """
         The forward pass of the EEG LLM consists of:
         1. An input: EEG data of shape (B, T, num_channels)
-        1. Linear projection to embedding dimension: (B, T, embedding_dim)
-        1. Encoding the EEG data to a hidden representation
-        1. Decoding the hidden representation to output token logits:
+        2. Linear projection to embedding dimension: (B, T, embedding_dim)
+        3. Encoding the EEG data to a hidden representation
+        4. Decoding the hidden representation to output token logits:
         (B, T, vocab_size)
         """
 
-        x = self.linear1(x) # (B, T, C) -> (B, T, embedding_dim)
+        x = self.linear1(x)  # (B, T, C) -> (B, T, embedding_dim)
         x = self.relu(x)
 
         x_enc = self.encoder(x)
@@ -85,3 +84,4 @@ class EEGLLM(nn.Module):
         durations = self.duration_prediction_linear4(durations).squeeze(-1)
 
         return vocab_distribution, durations
+
