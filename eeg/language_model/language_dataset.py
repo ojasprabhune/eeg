@@ -19,6 +19,7 @@ class LanguageDataset(Dataset):
     def __init__(
         self,
         features_sequences: torch.Tensor,
+        mode: str = "train",
         label_sentence_path: str = "eeg/language_model/data/",
         device: str = "cuda",
         print_shapes: bool = False,
@@ -32,6 +33,7 @@ class LanguageDataset(Dataset):
         print(f"{Colors.HEADER}{Colors.BOLD}Initializing dataset...{Colors.ENDC}")
         self.print_shapes = print_shapes
         self.device = device
+        self.mode = mode
 
         super().__init__()
 
@@ -46,13 +48,16 @@ class LanguageDataset(Dataset):
         labels = language_tokenizer.encode(sentences)
 
         label_masks = (labels != 0).type(torch.int)
-        label_masks = label_masks.unsqueeze(-1).repeat(1, 1, 4)
 
         if print_shapes:
             print(f"{Colors.OKGREEN}Features shape: {features.shape}{Colors.ENDC}")
-            print(f"{Colors.OKGREEN}Feature masks shape: {feature_masks.shape}{Colors.ENDC}")
+            print(
+                f"{Colors.OKGREEN}Feature masks shape: {feature_masks.shape}{Colors.ENDC}"
+            )
             print(f"{Colors.OKGREEN}Labels shape: {labels.shape}{Colors.ENDC}")
-            print(f"{Colors.OKGREEN}Label masks shape: {label_masks.shape}{Colors.ENDC}")
+            print(
+                f"{Colors.OKGREEN}Label masks shape: {label_masks.shape}{Colors.ENDC}"
+            )
 
         # --- train-val split ---
 
@@ -78,34 +83,32 @@ class LanguageDataset(Dataset):
             print(f"{Colors.WARNING}Total # of chunks: {self.__len__()}{Colors.ENDC}")
 
     def __len__(self) -> int:
-        return len(self.train_features)
+        return (
+            len(self.train_features) if self.mode == "train" else len(self.val_features)
+        )
 
     def __getitem__(
         self, index: int
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Returns the feature sequences, masks, and label sequences in the chunk
-        at the given index from the training set.
+        at the given index from either the training or validation set.
         """
 
-        features = self.train_features[index]
-        feature_mask = self.train_feature_masks[index]
-        labels = self.train_labels[index]
-        label_mask = self.train_label_masks[index]
+        if self.mode == "train":
+            features = self.train_features[index]
+            feature_mask = self.train_feature_masks[index]
+            labels = self.train_labels[index]
+            label_mask = self.train_label_masks[index]
+        else:
+            features = self.val_features[index]
+            feature_mask = self.val_feature_masks[index]
+            labels = self.val_labels[index]
+            label_mask = self.val_label_masks[index]
 
-        return torch.tensor(features), torch.tensor(feature_mask), torch.tensor(labels), torch.tensor(label_mask)
-
-    def get_val_data(
-        self, index: int
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        """
-        Returns the feature sequences, masks, and label sequences in the chunk
-        at the given index from the validation set.
-        """
-
-        features = self.val_features[index]
-        feature_mask = self.val_feature_masks[index]
-        labels = self.val_labels[index]
-        label_mask = self.val_label_masks[index]
-
-        return torch.tensor(features), torch.tensor(feature_mask), torch.tensor(labels), torch.tensor(label_mask)
+        return (
+            torch.tensor(features),
+            torch.tensor(feature_mask),
+            torch.tensor(labels),
+            torch.tensor(label_mask),
+        )

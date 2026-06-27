@@ -243,8 +243,16 @@ def train():
 
         # --- end-of-epoch validation ---
         val_loss, val_acc, val_f1 = validate()
-        run.log({"val_loss": val_loss, "val_acc": val_acc, "val_f1": val_f1, "epoch": i + 1})
-        epoch_tqdm.set_postfix({"val_loss": f"{val_loss:.4f}", "val_acc": f"{val_acc:.3f}", "val_f1": f"{val_f1:.3f}"})
+        run.log(
+            {"val_loss": val_loss, "val_acc": val_acc, "val_f1": val_f1, "epoch": i + 1}
+        )
+        epoch_tqdm.set_postfix(
+            {
+                "val_loss": f"{val_loss:.4f}",
+                "val_acc": f"{val_acc:.3f}",
+                "val_f1": f"{val_f1:.3f}",
+            }
+        )
 
         if (i + 1) % save_every == 0:
             latest_ckpt = {
