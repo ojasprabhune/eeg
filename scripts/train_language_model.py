@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from eeg.language_model import LanguageDataset
-from eeg.language_model.model import LanguageModel
+from eeg.language_model import LanguageModel
 
 with open("config/language_model.yaml", "r") as config_file:
     config = yaml.safe_load(config_file)
@@ -23,7 +23,7 @@ with open("config/language_model.yaml", "r") as config_file:
     vocab_size = config["vocab_size"]
     num_layers = config["num_layers"]
     num_heads = config["num_heads"]
-    num_channels = config["num_channels"]
+    num_classes = config["num_classes"]
     embedding_dim = config["embedding_dim"]
     ffn_hidden_dim = config["ffn_hidden_dim"]
     qk_length = config["qk_length"]
@@ -60,7 +60,7 @@ model = LanguageModel(
     max_length=max_length,
 
     dropout=dropout
-        ).to(device)
+).to(device)
 
 optimizer = AdamW(model.parameters(), lr=base_lr, betas=[0.9, 0.98], eps=1e-9)
 loss_fn = CrossEntropyLoss(reduction="none")
@@ -92,35 +92,42 @@ def train():
         iter_tqdm = tqdm(language_dataloader, dynamic_ncols=True)
         for feature, mask, label in iter_tqdm:
             # chunk: (B, T, C)
+            print(feature.shape)
+            print(mask.shape)
+            print(label.shape)
 
-#             eeg = eeg.to(device)
-#             labels = labels.to(device)
+            feature = feature.to(device)
+            mask = mask.to(device)
+            label = label.to(device)
+
+            label_logits = model(src=feature, tgt=label, mask=mask)  # out: (B, seq_len, vocab_size)
+
+            print(label_logits.shape)
+
+            quit()
+            loss = loss_fn(label_logits, labels)
+
+            iter_tqdm.set_postfix({"loss": loss.item()})
+            run.log({"loss": loss.item()})
+
+            optimizer.zero_grad()  # optimizer has access to all model params, makes grads 0
+            loss.backward()  # calculates and adds gradients to params so optim sees
+            optimizer.step()  # optim looks at gradients and steps accordingly
+            scheduler.step()  # steps lr
+
+        if (i + 1) % save_every == 0:
+            latest_ckpt = {
+                "epochs": i,
+                "model": model.state_dict(),
+                "optimizer": optimizer.state_dict(),
+            }
+
+            torch.save(latest_ckpt, f"{save_ckpt_path}_epoch_{i + 1}.pth")
+
+    run.finish()
 #
-#             label_logits = model(eeg)  # out: (B, seq_len, vocab_size)
 #
-#             loss = loss_fn(label_logits, labels)
-#
-#             iter_tqdm.set_postfix({"loss": loss.item()})
-#             run.log({"loss": loss.item()})
-#
-#             optimizer.zero_grad()  # optimizer has access to all model params, makes grads 0
-#             loss.backward()  # calculates and adds gradients to params so optim sees
-#             optimizer.step()  # optim looks at gradients and steps accordingly
-#             scheduler.step()  # steps lr
-#
-#         if (i + 1) % save_every == 0:
-#             latest_ckpt = {
-#                 "epochs": i,
-#                 "model": model.state_dict(),
-#                 "optimizer": optimizer.state_dict(),
-#             }
-#
-#             torch.save(latest_ckpt, f"{save_ckpt_path}_epoch_{i + 1}.pth")
-#
-#     run.finish()
-#
-#
-# train()
+train()
 #
 # latest_ckpt = {
 #     "epochs": epochs,

@@ -1,8 +1,6 @@
 import torch
 import torch.nn as nn
 
-from .transformer import Decoder, Encoder
-
 
 class LanguageModel(nn.Module):
     """ """
@@ -23,41 +21,52 @@ class LanguageModel(nn.Module):
 
         super().__init__()
 
-        self.encoder = Encoder(
-            vocab_size=vocab_size,
-            num_layers=num_layers,
-            num_heads=num_heads,
-            embedding_dim=embedding_dim,
-            ffn_hidden_dim=ffn_hidden_dim,
-            qk_length=qk_length,
-            value_length=value_length,
-            max_length=max_length,
+        self.transformer = nn.Transformer(
+            d_model=embedding_dim,
+            nhead=num_heads,
+            num_encoder_layers=num_layers,
+            num_decoder_layers=num_layers,
+            dim_feedforward=ffn_hidden_dim,
             dropout=dropout,
+            batch_first=True,
         )
 
-        self.decoder = Decoder(
-            vocab_size=vocab_size,
-            num_layers=num_layers,
-            num_heads=num_heads,
-            embedding_dim=embedding_dim,
-            ffn_hidden_dim=ffn_hidden_dim,
-            qk_length=qk_length,
-            value_length=value_length,
-            max_length=max_length,
-            dropout=dropout,
-        )
-
+        self.decoder_embedding = nn.Embedding(vocab_size, embedding_dim)
         self.linear_projection = nn.Linear(num_inputs_classes, embedding_dim)
-        self.dropout = nn.Dropout(p=dropout)
         self.relu = nn.ReLU()
 
-    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def make_mask(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Create a mask to prevent attention to future tokens.
+        """
+
+        B, T, C = x.size()
+        ones = torch.ones((1, T, T))
+        out = torch.tril(ones, 1)
+
+        return out
+
+    def forward(
+        self,
+        src: torch.Tensor,
+        tgt: torch.Tensor,
+        mask: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """ """
 
-        x = self.linear_projection(x)  # (B, T, C) -> (B, T, embedding_dim)
-        x = self.relu(x)
+        src = self.linear_projection(src)  # (B, T, C) -> (B, T, embedding_dim)
+        src = self.relu(src)
 
-        x_enc = self.encoder(x)
-        x_dec = self.decoder(x, x_enc)
+        tgt = self.decoder_embedding(tgt)
 
-        return x_dec
+        pred = self.transformer(
+            src,
+            tgt,
+            src_mask=self.make_mask(src),
+            tgt_mask=self.make_mask(tgt),
+            src_key_padding_mask=mask,
+            tgt_key_padding_mask=mask,
+            memory_key_padding_mask=mask
+        )
+
+        return pred
