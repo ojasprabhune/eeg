@@ -45,33 +45,8 @@ class LanguageDataset(Dataset):
         sentences = [re.sub(r"[^a-z]", "", sentence.lower()) for sentence in sentences]
         labels = language_tokenizer.encode(sentences)
 
-        max_seq_length = labels.shape[-1]
-
-        label_mask_sequences = [] # 150 rows
-        for sequence_mask in feature_masks:
-            label_sequence_masks = [] # sequence length
-            for i, mask_value in enumerate(sequence_mask):
-
-                if i == 0:
-                    label_sequence_masks.append([1] * 4) # add <SOS> token if first label
-
-                elif sequence_mask[i] == 0 and sequence_mask[i - 1] == 1:
-                    label_sequence_masks.append([1] * 4) # <EOS> token if padding started
-
-                elif i == max_seq_length - 1:
-                    label_sequence_masks.append([1] * 4) # <EOS> token if end of sequence and still valid
-
-                else:
-                    # add 4D vector for each value in the sequence
-                    label_sequence_masks.append([mask_value] * 4) 
-
-            label_mask_sequences.append(label_sequence_masks) # add sequence to full list
-
-        label_masks = torch.tensor(label_mask_sequences)
-
-        print(label_masks[0])
-        print(labels[0])
-        quit()
+        label_masks = (labels != 0).type(torch.int)
+        label_masks = label_masks.unsqueeze(-1).repeat(1, 1, 4)
 
         if print_shapes:
             print(f"{Colors.OKGREEN}Features shape: {features.shape}{Colors.ENDC}")
@@ -114,11 +89,11 @@ class LanguageDataset(Dataset):
         """
 
         features = self.train_features[index]
-        feature_masks = self.train_feature_masks[index]
+        feature_mask = self.train_feature_masks[index]
         labels = self.train_labels[index]
-        label_masks = self.train_label_masks[index]
+        label_mask = self.train_label_masks[index]
 
-        return torch.tensor(features), torch.tensor(masks), torch.tensor(labels), torch.tensor(label_masks)
+        return torch.tensor(features), torch.tensor(feature_mask), torch.tensor(labels), torch.tensor(label_mask)
 
     def get_val_data(
         self, index: int
@@ -129,8 +104,8 @@ class LanguageDataset(Dataset):
         """
 
         features = self.val_features[index]
-        feature_masks = self.val_feature_masks[index]
+        feature_mask = self.val_feature_masks[index]
         labels = self.val_labels[index]
-        label_masks = self.val_label_masks[index]
+        label_mask = self.val_label_masks[index]
 
-        return torch.tensor(features), torch.tensor(masks), torch.tensor(labels), torch.tensor(label_masks)
+        return torch.tensor(features), torch.tensor(feature_mask), torch.tensor(labels), torch.tensor(label_mask)

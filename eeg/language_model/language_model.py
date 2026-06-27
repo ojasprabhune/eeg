@@ -50,7 +50,8 @@ class LanguageModel(nn.Module):
         self,
         src: torch.Tensor,
         tgt: torch.Tensor,
-        mask: torch.Tensor
+        src_pad_mask: torch.Tensor,
+        tgt_pad_mask: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """ """
 
@@ -64,9 +65,9 @@ class LanguageModel(nn.Module):
             tgt,
             src_mask=self.make_mask(src),
             tgt_mask=self.make_mask(tgt),
-            src_key_padding_mask=mask,
-            tgt_key_padding_mask=mask,
-            memory_key_padding_mask=mask
+            src_key_padding_mask=src_pad_mask,
+            tgt_key_padding_mask=tgt_pad_mask,
+            memory_key_padding_mask=src_pad_mask
         )
 
         return pred

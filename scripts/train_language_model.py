@@ -90,21 +90,28 @@ def train():
         epoch_tqdm.set_description(f"Epoch {i + 1}")
 
         iter_tqdm = tqdm(language_dataloader, dynamic_ncols=True)
-        for feature, mask, label in iter_tqdm:
+        for feature, feature_mask, label, label_mask in iter_tqdm:
             # chunk: (B, T, C)
             print(feature.shape)
-            print(mask.shape)
+            print(feature_mask.shape)
             print(label.shape)
+            print(label_mask.shape)
 
             feature = feature.to(device)
-            mask = mask.to(device)
+            feature_mask = feature_mask.to(device).bool()
             label = label.to(device)
+            label_mask = label_mask.to(device).bool()
 
-            label_logits = model(src=feature, tgt=label, mask=mask)  # out: (B, seq_len, vocab_size)
+            label_logits = model(
+                src=feature,
+                tgt=label,
+                src_pad_mask=feature_mask,
+                tgt_pad_mask=label_mask
+            )  # out: (B, seq_len, vocab_size)
 
             print(label_logits.shape)
-
             quit()
+
             loss = loss_fn(label_logits, labels)
 
             iter_tqdm.set_postfix({"loss": loss.item()})
