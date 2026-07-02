@@ -1,13 +1,13 @@
 # language_model
 
 vocab_size: 29
-num_layers: 2
-num_heads: 2
+num_layers: 4
+num_heads: 4
 num_classes: 4
-embedding_dim: 32
-ffn_hidden_dim: 32
-qk_length: 32
-value_length: 32
+embedding_dim: 64
+ffn_hidden_dim: 64
+qk_length: 64
+value_length: 64
 max_length: 2048
 
 dropout: 0.1
@@ -15,7 +15,7 @@ dropout: 0.1
 # training
 
 device: cpu
-batch_size: 16
+batch_size: 32
 warmup_steps: 4000
 base_lr: 5e-5
 epochs: 5000
@@ -23,5 +23,5 @@ epochs: 5000
 run_name: language_model
 # use_ckpt_path: /var/log/thavamount/eeg_ckpts/eeg_lm/eeg_llm.pth
 use_ckpt_path: None
-save_ckpt_path: None
+save_ckpt_path:
 save_every: 100
