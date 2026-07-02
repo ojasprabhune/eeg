@@ -101,8 +101,8 @@ def validate() -> tuple[float, float]:
             label_logits = model(
                 src=in_feature,
                 tgt=in_label,
-                src_pad_mask=in_feature_mask,
-                tgt_pad_mask=in_label_mask,
+                src_pad_mask=~in_feature_mask,  # flip because 1 should mean padding
+                tgt_pad_mask=~in_label_mask,
             )  # out: (B, seq_len, vocab_size)
 
             label_logits = label_logits.transpose(1, 2)
@@ -159,8 +159,8 @@ def train():
             label_logits = model(
                 src=in_feature,
                 tgt=in_label,
-                src_pad_mask=in_feature_mask,
-                tgt_pad_mask=in_label_mask,
+                src_pad_mask=~in_feature_mask,  # flip because 1 should mean padding
+                tgt_pad_mask=~in_label_mask,
             )  # out: (B, seq_len, vocab_size)
 
             label_logits = label_logits.transpose(1, 2)
@@ -182,7 +182,7 @@ def train():
             }
         )
 
-        if (i + 1) % save_every == 0:
+        if (i + 1) % save_every == 0 and save_ckpt_path is not None:
             latest_ckpt = {
                 "epochs": i,
                 "model": model.state_dict(),
@@ -202,4 +202,5 @@ latest_ckpt = {
     "optimizer": optimizer.state_dict(),
 }
 
-torch.save(latest_ckpt, save_ckpt_path)
+if save_ckpt_path is not None:
+    torch.save(latest_ckpt, save_ckpt_path)
