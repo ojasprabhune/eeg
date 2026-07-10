@@ -20,9 +20,8 @@ warmup_steps: 4000
 base_lr: 5e-5
 epochs: 10000
 
-run_name: lm_no_eeg
+run_name: lm_normal_relu
 # use_ckpt_path: /var/log/thavamount/eeg_ckpts/eeg_lm/eeg_llm.pth
-# use_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/normal/lm_normal_epoch_4750.pth
-use_ckpt_path: null
-save_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/normal/lm_no_eeg
+use_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/normal/lm_normal_epoch_4750.pth
+save_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/normal/lm_normal_relu
 save_every: 250

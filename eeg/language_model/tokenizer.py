@@ -10,7 +10,10 @@ class Tokenizer:
 
 
 class LanguageTokenizer(Tokenizer):
-    """ """
+    """
+    A tokenizer for the language model. It converts letters to tokens and vice
+    versa. It also adds special tokens for padding, start of sequence, and end of sequence.
+    """
 
     def __init__(self) -> None:
         vocab = {"<PAD>": 0, "<SOS>": 1, "<EOS>": 2}
@@ -54,10 +57,23 @@ class LanguageTokenizer(Tokenizer):
         """
         decoded = []
 
-        for sequence in data:
-            letters = []
+        if len(data.size()) == 2:
+            for sequence in data:
+                letters = []
 
-            for token in sequence:
+                for token in sequence:
+                    letter = self.token_to_letter[int(token.item())]
+
+                    # skip special tokens
+                    if letter in ("<SOS>", "<EOS>", "<PAD>"):
+                        continue
+
+                    letters.append(letter)
+
+                decoded.append("".join(letters))
+        else:
+            letters = []
+            for token in data:
                 letter = self.token_to_letter[int(token.item())]
 
                 # skip special tokens

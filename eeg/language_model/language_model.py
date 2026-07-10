@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 
+from .transformer import PositionalEncoding
+
 
 class LanguageModel(nn.Module):
     """ """
@@ -21,6 +23,8 @@ class LanguageModel(nn.Module):
 
         self.batch_size = batch_size
         self.num_heads = num_heads
+
+        self.pos_enc = PositionalEncoding(embedding_dim, dropout=dropout)
 
         self.transformer = nn.Transformer(
             d_model=embedding_dim,
@@ -47,13 +51,13 @@ class LanguageModel(nn.Module):
         """ """
 
         src = self.linear_projection(src)  # (B, T, C) -> (B, T, embedding_dim)
-        src = self.relu(src)
+        src = self.pos_enc(src)
 
         tgt = self.decoder_embedding(tgt)
 
         tgt_mask = nn.Transformer.generate_square_subsequent_mask(
             tgt.size(1), device=tgt.device
-        )
+        ).bool()
 
         pred = self.transformer(
             src,

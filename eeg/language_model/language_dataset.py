@@ -96,12 +96,12 @@ class LanguageDataset(Dataset):
         """
 
         if self.mode == "train":
-            features = self.train_features[index]
+            features = self.train_features[index] * 0
             feature_mask = self.train_feature_masks[index]
             labels = self.train_labels[index]
             label_mask = self.train_label_masks[index]
         else:
-            features = self.val_features[index]
+            features = self.val_features[index] * 0
             feature_mask = self.val_feature_masks[index]
             labels = self.val_labels[index]
             label_mask = self.val_label_masks[index]

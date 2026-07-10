@@ -1,7 +1,7 @@
 """
-Script to train the language model in the language model dataset, given many
-sequences of sentences, trying to translate between EEG sequence probabilities
-and sentence tokens.
+Script to train the linear language model in the language model dataset, given
+many sequences of sentences, trying to translate between EEG sequence
+probabilities and sentence tokens.
 """
 
 import torch
@@ -12,9 +12,9 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 import wandb
-from eeg.language_model import LanguageDataset, LanguageModel
+from eeg.language_model import LanguageDataset, LanguageModelLinear
 
-with open("config/language_model.yaml", "r") as config_file:
+with open("config/language_model_linear.yaml", "r") as config_file:
     config = yaml.safe_load(config_file)
 
     vocab_size = config["vocab_size"]
@@ -56,7 +56,9 @@ train_language_dataloader = DataLoader(
 )
 val_language_dataloader = DataLoader(val_language_dataset, batch_size=32, shuffle=False)
 
-model = LanguageModel(
+model = LanguageModelLinear(
+    input_seq_len=train_language_dataset.features.shape[1] - 1,
+    output_seq_len=train_language_dataset.labels.shape[1] - 1,
     vocab_size=vocab_size,
     num_layers=num_layers,
     num_heads=num_heads,
@@ -70,15 +72,6 @@ loss_fn = CrossEntropyLoss(ignore_index=0)  # ignore <PAD> token id
 
 param_count = sum(p.numel() for p in model.parameters() if p.requires_grad)
 print(f"Number of model parameters: {param_count:,}")
-
-if use_ckpt_path is not None:
-    state_dict = torch.load(use_ckpt_path, map_location=device)
-    model.load_state_dict(state_dict["model"])
-    optimizer.load_state_dict(state_dict["optimizer"])
-    start = state_dict["epochs"]
-    print(f"Loaded checkpoint from {use_ckpt_path}")
-else:
-    start = 0
 
 
 def validate() -> tuple[float, float]:
@@ -109,9 +102,7 @@ def validate() -> tuple[float, float]:
 
             label_logits = model(
                 src=in_feature,
-                tgt=in_label,
                 src_pad_mask=~in_feature_mask,  # flip because 1 should mean padding
-                tgt_pad_mask=~in_label_mask,
             )  # out: (B, seq_len, vocab_size)
 
             label_logits = label_logits.transpose(1, 2)
@@ -148,7 +139,7 @@ def train():
     wandb.log({"param_count": param_count})
     model.train()
 
-    epoch_tqdm = tqdm(range(start, epochs), dynamic_ncols=True)
+    epoch_tqdm = tqdm(range(epochs), dynamic_ncols=True)
     for i in epoch_tqdm:
         epoch_tqdm.set_description(f"Epoch {i + 1}")
 
@@ -167,9 +158,7 @@ def train():
 
             label_logits = model(
                 src=in_feature,
-                tgt=in_label,
                 src_pad_mask=~in_feature_mask,  # flip because 1 should mean padding
-                tgt_pad_mask=~in_label_mask,
             )  # out: (B, seq_len, vocab_size)
 
             label_logits = label_logits.transpose(1, 2)

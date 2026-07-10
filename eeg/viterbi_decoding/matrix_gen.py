@@ -1,4 +1,3 @@
-import random
 import re
 
 import numpy as np
@@ -86,6 +85,20 @@ def get_viterbi_matrices(
 def make_observation_matrix(
     sequence: list[int], num_classes: int, correct_mean: float
 ) -> NDArray[np.float64]:
+    """
+    Returns an observation matrix of shape (T, num_classes) where T is the
+    length of the input sequence. Each row corresponds to a timestep and each
+    column corresponds to a class. The values in the matrix represent the
+    probability of observing a particular class at a given timestep, based on
+    the input sequence and the specified correct_mean. The correct class for
+    each timestep is assigned a probability of correct_mean, while the other
+    classes are assigned a probability of (1 - correct_mean) / (num_classes - 1).
+
+    Does not use zero-based indexing for the input sequence, so the input
+    sequence should contain class labels in the range [1, num_classes]. The
+    function will internally convert these to zero based indexing for processing.
+    """
+
     sequence = [x - 1 for x in sequence]
 
     seq_length = len(sequence)
@@ -128,7 +141,9 @@ def make_placeholder_feature_sequences(
     for sentence in cleaned_sentences:
         T = len(sentence)
 
-        gesture_sequence = [random.randint(1, num_classes) for _ in range(T)]
+        gesture_sequence = [
+            get_gesture_class(letter, zero_based_idx=False) for letter in sentence
+        ]
 
         obs_mat = make_observation_matrix(
             gesture_sequence,
