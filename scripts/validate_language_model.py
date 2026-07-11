@@ -23,7 +23,8 @@ with open("config/language_model.yaml", "r") as config_file:
     qk_length = config["qk_length"]
     value_length = config["value_length"]
     max_length = config["max_length"]
-    dropout = config["dropout"]
+    encoder_dropout = config["encoder_dropout"]
+    decoder_dropout = config["decoder_dropout"]
 
     device = config["device"]
     batch_size = config["batch_size"]
@@ -52,7 +53,8 @@ model = LanguageModel(
     num_heads=num_heads,
     embedding_dim=embedding_dim,
     ffn_hidden_dim=ffn_hidden_dim,
-    dropout=dropout,
+    encoder_dropout=encoder_dropout,
+    decoder_dropout=decoder_dropout,
 ).to(device)
 
 tokenizer = LanguageTokenizer()
@@ -160,10 +162,17 @@ def validate(beam_width: int):
                 # reshape back to batches: (B, K, vocab_size)
                 next_logits = next_logits.view(batch_size, beam_width, -1)
 
+                log_probs = torch.log_softmax(next_logits, dim=-1)
+                finished_mask = finished.unsqueeze(-1)
+                frozen_log_probs = torch.full_like(log_probs, float("-inf"))
+                frozen_log_probs[:, :, 2] = 0.0
+                log_probs = torch.where(finished_mask, frozen_log_probs, log_probs)
+
                 # add log probabilities
-                new_scores = sequence_scores.unsqueeze(-1) + torch.log_softmax(
-                    next_logits, dim=-1
+                new_scores = (
+                    sequence_scores.unsqueeze(-1) + log_probs
                 )  # (B, K, vocab_size)
+
                 new_scores = new_scores.view(batch_size, -1)  # (B, K * vocab_size)
 
                 # pick the top K survivors out of all possibilities
