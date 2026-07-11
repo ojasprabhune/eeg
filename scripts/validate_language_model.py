@@ -16,9 +16,11 @@ with open("config/language_model.yaml", "r") as config_file:
 
     vocab_size = config["vocab_size"]
     num_layers = config["num_layers"]
+    decoder_num_layers = config["decoder_num_layers"]
     num_heads = config["num_heads"]
     num_classes = config["num_classes"]
     embedding_dim = config["embedding_dim"]
+    decoder_embedding_dim = config["decoder_embedding_dim"]
     ffn_hidden_dim = config["ffn_hidden_dim"]
     qk_length = config["qk_length"]
     value_length = config["value_length"]
@@ -26,6 +28,8 @@ with open("config/language_model.yaml", "r") as config_file:
 
     encoder_dropout = config["encoder_dropout"]
     decoder_dropout = config["decoder_dropout"]
+
+    recon_lambda = config["recon_lambda"]
 
     device = config["device"]
     batch_size = config["batch_size"]
@@ -51,8 +55,10 @@ val_language_dataloader = DataLoader(val_language_dataset, batch_size=32, shuffl
 model = LanguageModel(
     vocab_size=vocab_size,
     num_layers=num_layers,
+    decoder_num_layers=decoder_num_layers,
     num_heads=num_heads,
     embedding_dim=embedding_dim,
+    decoder_embedding_dim=decoder_embedding_dim,
     ffn_hidden_dim=ffn_hidden_dim,
     encoder_dropout=encoder_dropout,
     decoder_dropout=decoder_dropout,
@@ -94,7 +100,7 @@ def validate(beam_width: int):
             in_label_mask = label_mask[:, :1]  # start with <SOS>
 
             # probability distribution for the next token
-            label_logits = model(
+            label_logits, recon = model(
                 src=in_feature,
                 tgt=in_label,
                 src_pad_mask=~in_feature_mask,  # flip because 1 should mean padding
@@ -150,7 +156,7 @@ def validate(beam_width: int):
                 tgt_mask = torch.ones_like(decoder_input).bool()
 
                 # run model on all B*K paths simultaneously
-                logits = model(
+                logits, recon = model(
                     src=expanded_feature,
                     tgt=decoder_input,
                     src_pad_mask=~expanded_feature_mask,

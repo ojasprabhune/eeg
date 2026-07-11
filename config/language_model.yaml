@@ -15,7 +15,7 @@ max_length: 2048
 encoder_dropout: 0.1
 decoder_dropout: 0.1
 
-recon_lambda: 2
+recon_lambda: 5
 
 # training
 
@@ -27,7 +27,7 @@ epochs: 10000
 
 run_name: lm_enc_recon
 # use_ckpt_path: /var/log/thavamount/eeg_ckpts/eeg_lm/eeg_llm.pth
-# use_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/moredrop_epoch_2250.pth
-use_ckpt_path: null
+use_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/enc_recon_epoch_2500.pth
+# use_ckpt_path: null
 save_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/enc_recon
 save_every: 250

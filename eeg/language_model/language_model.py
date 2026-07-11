@@ -5,7 +5,11 @@ from .transformer import PositionalEncoding
 
 
 class LanguageModel(nn.Module):
-    """ """
+    """
+    A language model that predicts the corrosponding sequence of letters given
+    a sequence of probability distributions of gesture classes of ASL letters
+    based on EEG data.
+    """
 
     def __init__(
         self,
