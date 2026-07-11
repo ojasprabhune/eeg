@@ -6,7 +6,7 @@ and sentence tokens.
 
 import torch
 import yaml
-from torch.nn import CrossEntropyLoss
+from torch.nn import CrossEntropyLoss, MSELoss
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -28,8 +28,11 @@ with open("config/language_model.yaml", "r") as config_file:
     qk_length = config["qk_length"]
     value_length = config["value_length"]
     max_length = config["max_length"]
+
     encoder_dropout = config["encoder_dropout"]
     decoder_dropout = config["decoder_dropout"]
+
+    recon_lambda = config["recon_lambda"]
 
     device = config["device"]
     batch_size = config["batch_size"]
@@ -71,7 +74,8 @@ model = LanguageModel(
 ).to(device)
 
 optimizer = AdamW(model.parameters(), lr=base_lr, betas=(0.9, 0.98), eps=1e-9)
-loss_fn = CrossEntropyLoss(ignore_index=0)  # ignore <PAD> token id
+ce_loss_fn = CrossEntropyLoss(ignore_index=0)  # ignore <PAD> token id
+mse_loss_fn = MSELoss()
 
 param_count = sum(p.numel() for p in model.parameters() if p.requires_grad)
 print(f"Number of model parameters: {param_count:,}")
@@ -110,17 +114,23 @@ def validate() -> tuple[float, float]:
             in_feature_mask = feature_mask[:, :-1]
             in_label = label[:, :-1]
             in_label_mask = label_mask[:, :-1]
+
+            gt_feature = feature[:, 1:, :]
             gt_label = label[:, 1:]
 
-            label_logits = model(
+            label_logits, recon = model(
                 src=in_feature,
                 tgt=in_label,
                 src_pad_mask=~in_feature_mask,  # flip because 1 should mean padding
                 tgt_pad_mask=~in_label_mask,
             )  # out: (B, seq_len, vocab_size)
 
-            label_logits = label_logits.transpose(1, 2)
-            loss = loss_fn(label_logits, gt_label)
+            label_logits = label_logits.transpose(1, 2)  # (B, vocab_size, seq_len)
+
+            loss_letters = ce_loss_fn(label_logits, gt_label)
+            loss_recon = mse_loss_fn(recon, gt_feature)
+
+            loss = loss_letters + recon_lambda * loss_recon
 
             total_loss += loss.item() * batch_size
             preds = label_logits.argmax(dim=1)
@@ -168,9 +178,11 @@ def train():
             in_feature_mask = feature_mask[:, :-1]
             in_label = label[:, :-1]
             in_label_mask = label_mask[:, :-1]
+
+            gt_feature = feature[:, 1:, :]
             gt_label = label[:, 1:]
 
-            label_logits = model(
+            label_logits, recon = model(
                 src=in_feature,
                 tgt=in_label,
                 src_pad_mask=~in_feature_mask,  # flip because 1 should mean padding
@@ -178,23 +190,28 @@ def train():
             )  # out: (B, seq_len, vocab_size)
 
             label_logits = label_logits.transpose(1, 2)
-            loss = loss_fn(label_logits, gt_label)
+
+            loss_letters = ce_loss_fn(label_logits, gt_label)
+            loss_recon = mse_loss_fn(recon, gt_feature)
+
+            loss = loss_letters + recon_lambda * loss_recon
 
             iter_tqdm.set_postfix({"loss": loss.item()})
-            run.log({"loss": loss.item()})
+            run.log({"letter loss": loss_letters.item()})
+            run.log({"recon loss": loss_recon.item()})
 
             optimizer.zero_grad()  # optimizer has access to all model params, makes grads 0
-            loss.backward()  # calculates and adds gradients to params so optim sees
+            loss_letters.backward()  # calculates and adds gradients to params so optim sees
             optimizer.step()  # optim looks at gradients and steps accordingly
 
         val_loss, val_acc = validate()
-        run.log({"val_loss": val_loss, "val_acc": val_acc, "epoch": i + 1})
         epoch_tqdm.set_postfix(
             {
                 "val_loss": f"{val_loss:.4f}",
                 "val_acc": f"{val_acc:.3f}",
             }
         )
+        run.log({"val_loss": val_loss, "val_acc": val_acc, "epoch": i + 1})
 
         if (i + 1) % save_every == 0 and save_ckpt_path is not None:
             latest_ckpt = {

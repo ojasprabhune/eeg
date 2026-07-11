@@ -23,12 +23,9 @@ class LanguageModel(nn.Module):
 
         super().__init__()
 
+        self.relu = nn.ReLU()
         self.pos_enc = PositionalEncoding(embedding_dim, dropout=encoder_dropout)
-
         self.linear_projection = nn.Linear(num_inputs_classes, embedding_dim)
-        self.ffn1 = nn.Linear(embedding_dim, embedding_dim)
-        self.ffn2 = nn.Linear(embedding_dim, embedding_dim)
-        self.ffn3 = nn.Linear(embedding_dim, embedding_dim)
 
         self.encoder_layer = nn.TransformerEncoderLayer(
             d_model=embedding_dim,
@@ -39,11 +36,12 @@ class LanguageModel(nn.Module):
         )
 
         self.encoder = nn.TransformerEncoder(
-            self.encoder_layer,
+            encoder_layer=self.encoder_layer,
             num_layers=num_layers,
             enable_nested_tensor=False,
         )
 
+        # --- task 1: letters -------------------------------------------------
         self.decoder_embedding = nn.Embedding(vocab_size, embedding_dim)
 
         self.decoder_layer = nn.TransformerDecoderLayer(
@@ -61,7 +59,9 @@ class LanguageModel(nn.Module):
 
         self.vocab_projection = nn.Linear(embedding_dim, vocab_size)
 
-        self.relu = nn.ReLU()
+        # --- task 2: enc recon -----------------------------------------------
+        self.reconffn1 = nn.Linear(embedding_dim, embedding_dim)
+        self.reconffn2 = nn.Linear(embedding_dim, num_inputs_classes)
 
     def forward(
         self,
@@ -74,16 +74,11 @@ class LanguageModel(nn.Module):
         src = self.linear_projection(src)  # (B, T_in, C) -> (B, T_in, embedding_dim)
         src = self.pos_enc(src)
 
-        # src = self.ffn1(src)
-        # src = self.relu(src)
-        # src = self.ffn2(src)
-        # src = self.relu(src)
-        # src = self.ffn3(src)
-
         memory: torch.Tensor = self.encoder(
             src, src_key_padding_mask=src_pad_mask
         )  # (B, T_in, C)
 
+        # --- task 1: letters -------------------------------------------------
         tgt = self.decoder_embedding(tgt)
 
         tgt_mask = nn.Transformer.generate_square_subsequent_mask(
@@ -99,6 +94,11 @@ class LanguageModel(nn.Module):
             memory_key_padding_mask=src_pad_mask,  # padding
         )
 
-        x = self.vocab_projection(pred)
+        logits = self.vocab_projection(pred)
 
-        return x
+        # --- task 2: enc recon -----------------------------------------------
+        recon = self.reconffn1(memory)
+        recon = self.relu(recon)
+        recon = self.reconffn2(recon)
+
+        return logits, recon

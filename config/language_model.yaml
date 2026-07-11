@@ -6,14 +6,16 @@ decoder_num_layers: 2
 num_heads: 4
 num_classes: 4
 embedding_dim: 64
-decoder_embedding_dim: 32
+decoder_embedding_dim: 64
 ffn_hidden_dim: 64
 qk_length: 64
 value_length: 64
 max_length: 2048
 
 encoder_dropout: 0.1
-decoder_dropout: 0.3
+decoder_dropout: 0.1
+
+recon_lambda: 2
 
 # training
 
@@ -23,9 +25,9 @@ warmup_steps: 4000
 base_lr: 5e-5
 epochs: 10000
 
-run_name: lm_transformer_more_dec_drop_smaller_dec
+run_name: lm_enc_recon
 # use_ckpt_path: /var/log/thavamount/eeg_ckpts/eeg_lm/eeg_llm.pth
-use_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/moredrop_epoch_2250.pth
-# use_ckpt_path: null
-save_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/moredrop_smaller_dec
+# use_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/moredrop_epoch_2250.pth
+use_ckpt_path: null
+save_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/enc_recon
 save_every: 250

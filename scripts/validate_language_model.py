@@ -23,6 +23,7 @@ with open("config/language_model.yaml", "r") as config_file:
     qk_length = config["qk_length"]
     value_length = config["value_length"]
     max_length = config["max_length"]
+
     encoder_dropout = config["encoder_dropout"]
     decoder_dropout = config["decoder_dropout"]
 
