@@ -1,3 +1,8 @@
+"""
+A file for generating matrixes used in Viterbi or language model decoding.
+Generates sequences like observation matrices or emission matrices.
+"""
+
 import re
 
 import numpy as np

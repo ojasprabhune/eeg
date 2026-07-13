@@ -101,6 +101,8 @@ def validate() -> tuple[float, float]:
     all_preds = []
     all_labels = []
 
+    val_iter_steps = 0
+
     with torch.no_grad():
         for feature, feature_mask, label, label_mask in val_language_dataloader:
             feature = feature.to(device)
@@ -118,11 +120,13 @@ def validate() -> tuple[float, float]:
             gt_feature = feature[:, 1:, :]
             gt_label = label[:, 1:]
 
-            label_logits, recon = model(
+            label_logits, recon, enc_letters = model(
                 src=in_feature,
                 tgt=in_label,
                 src_pad_mask=~in_feature_mask,  # flip because 1 should mean padding
                 tgt_pad_mask=~in_label_mask,
+                step=val_iter_steps,
+                return_epsilon=False,
             )  # out: (B, seq_len, vocab_size)
 
             label_logits = label_logits.transpose(1, 2)  # (B, vocab_size, seq_len)
@@ -140,6 +144,8 @@ def validate() -> tuple[float, float]:
 
             all_preds.append(preds.cpu())
             all_labels.append(gt_label.cpu())
+
+            val_iter_steps += 1
 
     model.train()
     avg_loss = total_loss / max(total, 1)
@@ -163,6 +169,8 @@ def train():
     wandb.log({"param_count": param_count})
     model.train()
 
+    iteration_steps = 0
+
     epoch_tqdm = tqdm(range(start, epochs), dynamic_ncols=True)
     for i in epoch_tqdm:
         epoch_tqdm.set_description(f"Epoch {i + 1}")
@@ -182,11 +190,13 @@ def train():
             gt_feature = feature[:, 1:, :]
             gt_label = label[:, 1:]
 
-            label_logits, recon = model(
+            label_logits, recon, enc_letters, epsilon = model(
                 src=in_feature,
                 tgt=in_label,
                 src_pad_mask=~in_feature_mask,  # flip because 1 should mean padding
                 tgt_pad_mask=~in_label_mask,
+                step=iteration_steps,
+                return_epsilon=True,
             )  # out: (B, seq_len, vocab_size)
 
             label_logits = label_logits.transpose(1, 2)
@@ -199,10 +209,13 @@ def train():
             iter_tqdm.set_postfix({"loss": loss.item()})
             run.log({"letter loss": loss_letters.item()})
             run.log({"recon loss": loss_recon.item()})
+            run.log({"epsilon": epsilon})
 
             optimizer.zero_grad()  # optimizer has access to all model params, makes grads 0
             loss_letters.backward()  # calculates and adds gradients to params so optim sees
             optimizer.step()  # optim looks at gradients and steps accordingly
+
+            iteration_steps += 1
 
         val_loss, val_acc = validate()
         epoch_tqdm.set_postfix(

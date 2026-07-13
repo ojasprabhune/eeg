@@ -255,9 +255,7 @@ def validate(beam_width: int):
         decoded_labels = tokenizer.decode(label_sequence)
 
         print(decoded_pred)
-        print(decoded_labels)
-
-        print()
+        print(f"{decoded_labels}\n")
 
 
 validate(beam_width=5)

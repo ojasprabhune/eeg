@@ -80,7 +80,7 @@ class LanguageDataset(Dataset):
         self.val_label_masks = self.label_masks[self.split_idx :, :]
 
         if print_shapes:
-            print(f"{Colors.WARNING}Total # of chunks: {self.__len__()}{Colors.ENDC}")
+            print(f"{Colors.WARNING}Number of sequences: {self.__len__()}{Colors.ENDC}")
 
     def __len__(self) -> int:
         return (
