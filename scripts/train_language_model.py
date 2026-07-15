@@ -42,6 +42,9 @@ with open("config/language_model.yaml", "r") as config_file:
     base_lr = float(config["base_lr"])
     epochs = config["epochs"]
 
+    min_value = config["min_value"]
+    k = config["k"]
+
     run_name = config["run_name"]
     use_ckpt_path = config["use_ckpt_path"]
     save_ckpt_path = config["save_ckpt_path"]
@@ -52,19 +55,25 @@ with open("config/language_model.yaml", "r") as config_file:
 train_language_dataset = LanguageDataset(
     num_classes=num_classes,
     mode="train",
-    print_shapes=True,
+    print_shapes=False,
 )
 
 val_language_dataset = LanguageDataset(
     num_classes=num_classes,
     mode="val",
-    print_shapes=True,
+    print_shapes=False,
 )
 
 train_language_dataloader = DataLoader(
-    train_language_dataset, batch_size=32, shuffle=True
+    train_language_dataset,
+    batch_size=32,
+    shuffle=True,
 )
-val_language_dataloader = DataLoader(val_language_dataset, batch_size=32, shuffle=False)
+val_language_dataloader = DataLoader(
+    val_language_dataset,
+    batch_size=32,
+    shuffle=False,
+)
 
 # --- model -------------------------------------------------------------------
 
@@ -78,6 +87,8 @@ model = LanguageModel(
     ffn_hidden_dim=ffn_hidden_dim,
     encoder_dropout=encoder_dropout,
     decoder_dropout=decoder_dropout,
+    k=k,
+    min_value=min_value,
 ).to(device)
 
 # --- training ----------------------------------------------------------------
@@ -114,6 +125,8 @@ def validate() -> tuple[float, float]:
     all_preds = []
     all_labels = []
 
+    step = 0
+
     with torch.no_grad():
         for feature, feature_mask, label, label_mask, _ in val_language_dataloader:
             feature = feature.to(device)
@@ -136,6 +149,8 @@ def validate() -> tuple[float, float]:
                 tgt=in_label,
                 src_pad_mask=~in_feature_mask,  # flip because 1 should mean padding
                 tgt_pad_mask=~in_label_mask,
+                step=step,
+                return_epsilon=False,
             )  # out: (B, seq_len, vocab_size)
 
             label_logits = label_logits.transpose(1, 2)  # (B, vocab_size, seq_len)
@@ -153,6 +168,8 @@ def validate() -> tuple[float, float]:
 
             all_preds.append(preds.cpu())
             all_labels.append(gt_label.cpu())
+
+            step += 1
 
     model.train()
     avg_loss = total_loss / max(total, 1)
@@ -179,6 +196,8 @@ def train():
     wandb.log({"param_count": param_count})
     model.train()
 
+    step = 0
+
     epoch_tqdm = tqdm(range(start, epochs), dynamic_ncols=True)
     for i in epoch_tqdm:
         epoch_tqdm.set_description(f"Epoch {i + 1}")
@@ -198,11 +217,13 @@ def train():
             gt_feature = feature[:, 1:, :]
             gt_label = label[:, 1:]
 
-            label_logits, recon = model(
+            label_logits, recon, epsilon = model(
                 src=in_feature,
                 tgt=in_label,
                 src_pad_mask=~in_feature_mask,  # flip because 1 should mean padding
                 tgt_pad_mask=~in_label_mask,
+                step=step,
+                return_epsilon=True,
             )  # out: (B, seq_len, vocab_size)
 
             label_logits = label_logits.transpose(1, 2)  # (B, vocab_size, seq_len)
@@ -213,13 +234,20 @@ def train():
             loss = loss_letters + recon_lambda * loss_recon
 
             iter_tqdm.set_postfix({"loss": loss.item()})
-            run.log({"loss": loss.item()})
-            run.log({"letter loss": loss_letters.item()})
-            run.log({"recon loss": loss_recon.item()})
+            run.log(
+                {
+                    "loss": loss.item(),
+                    "letter loss": loss_letters.item(),
+                    "recon loss": loss_recon.item(),
+                    "epsilon": epsilon,
+                }
+            )
 
             optimizer.zero_grad()  # optimizer has access to all model params, makes grads 0
             loss.backward()  # calculates and adds gradients to params so optim sees
             optimizer.step()  # optim looks at gradients and steps accordingly
+
+            step += 1
 
         val_loss, val_acc = validate()
         epoch_tqdm.set_postfix(
@@ -228,7 +256,13 @@ def train():
                 "val_acc": f"{val_acc:.3f}",
             }
         )
-        run.log({"val_loss": val_loss, "val_acc": val_acc, "epoch": i + 1})
+        run.log(
+            {
+                "val_loss": val_loss,
+                "val_acc": val_acc,
+                "epoch": i + 1,
+            }
+        )
 
         if (i + 1) % save_every == 0 and save_ckpt_path is not None:
             latest_ckpt = {

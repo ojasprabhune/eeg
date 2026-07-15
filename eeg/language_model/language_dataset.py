@@ -30,7 +30,14 @@ class LanguageDataset(Dataset):
         sequence length as each tokenized label sequence.
         """
 
-        print(f"{Colors.HEADER}{Colors.BOLD}Initializing dataset...{Colors.ENDC}")
+        if mode == "train":
+            print(
+                f"{Colors.HEADER}{Colors.BOLD}Initializing training dataset...{Colors.ENDC}"
+            )
+        else:
+            print(
+                f"{Colors.HEADER}{Colors.BOLD}Initializing validation dataset...{Colors.ENDC}"
+            )
         self.print_shapes = print_shapes
         self.device = device
         self.mode = mode

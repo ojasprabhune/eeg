@@ -219,10 +219,6 @@ def make_placeholder_feature_sequences(
                 accuracy=accuracy,
             )
 
-        print(gesture_sequence)
-        print(obs_mat)
-        quit()
-
         padded = np.zeros((max_len, num_classes), dtype=np.float32)
         padded[:T] = obs_mat
 

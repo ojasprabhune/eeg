@@ -87,7 +87,7 @@ class LanguageModel(nn.Module):
         step.
         """
         if schedule_type == "linear":
-            return max(0.0, 1.0 - (step / k))
+            return max(min_value, 1.0 - (step / k))
         elif schedule_type == "exponential":
             return 0.999**step
         elif schedule_type == "inverse_sigmoid":

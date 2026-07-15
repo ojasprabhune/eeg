@@ -51,6 +51,7 @@ with open("config/language_model.yaml", "r") as config_file:
 trie = Trie()
 
 val_language_dataset = LanguageDataset(
+    num_classes=num_classes,
     mode="val",
     print_shapes=True,
 )
