@@ -25,11 +25,15 @@ class LanguageModel(nn.Module):
         ffn_hidden_dim: int = 64,
         encoder_dropout: float = 0.1,
         decoder_dropout: float = 0.1,
+        k: int = 1000,
+        min_value: float = 0.0,
     ) -> None:
 
         super().__init__()
 
         self.embedding_dim = embedding_dim
+        self.k = k
+        self.min_value = min_value
 
         self.relu = nn.ReLU()
         self.pos_enc = PositionalEncoding(embedding_dim, dropout=encoder_dropout)
@@ -71,11 +75,12 @@ class LanguageModel(nn.Module):
         self.reconffn1 = nn.Linear(embedding_dim, embedding_dim)
         self.reconffn2 = nn.Linear(embedding_dim, num_inputs_classes)
 
-        # todo remove
-        self.letterffn1 = nn.Linear(embedding_dim, vocab_size)
-
     def get_epsilon(
-        self, step: int, k: int = 1000, schedule_type: str = "inverse_sigmoid"
+        self,
+        min_value: float,
+        step: int,
+        k: int = 1000,
+        schedule_type: str = "inverse_sigmoid",
     ) -> float:
         """
         Computes the mixing probability epsilon based on a k value and curent
@@ -95,7 +100,7 @@ class LanguageModel(nn.Module):
         tgt: torch.Tensor,
         src_pad_mask: torch.Tensor,
         tgt_pad_mask: torch.Tensor,
-        step: int,  # unused for now
+        step: int,
         return_epsilon: bool,
     ) -> tuple[torch.Tensor, torch.Tensor, float] | tuple[torch.Tensor, torch.Tensor]:
 
@@ -132,8 +137,12 @@ class LanguageModel(nn.Module):
             predictions = torch.argmax(logits_p1, dim=-1)  # (B, T)
 
         # --- mixing step ---
-        # epsilon = self.get_epsilon(step=step, k=4000)  # get epsilon
-        epsilon = 0.0  # currently using only autoregressive training
+        epsilon = self.get_epsilon(
+            min_value=self.min_value,
+            step=step,
+            k=self.k,
+            schedule_type="linear",
+        )  # get epsilon
 
         # fill a tensor of shape (B, T) of all epsilon values, then coin flip all
         coin_flips = torch.bernoulli(

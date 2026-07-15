@@ -5,8 +5,8 @@ import torch
 from torch.utils.data import Dataset
 
 from eeg.gesture2hand import Colors
-from eeg.viterbi_decoding import make_placeholder_feature_sequences
 
+from .matrix_gen import make_placeholder_feature_sequences
 from .tokenizer import LanguageTokenizer
 
 
@@ -18,7 +18,7 @@ class LanguageDataset(Dataset):
 
     def __init__(
         self,
-        features_sequences: torch.Tensor,
+        num_classes: int,
         mode: str = "train",
         label_sentence_path: str = "eeg/language_model/data/",
         device: str = "cuda",
@@ -43,7 +43,12 @@ class LanguageDataset(Dataset):
         sentences_file = open(f"{label_sentence_path}150sentences.txt", "r")
         sentences = sentences_file.readlines()
         features, feature_masks = make_placeholder_feature_sequences(
-            sentences, num_classes=5, correct_mean=0.6
+            sentences,
+            num_classes=num_classes,
+            correct_mean=0.9,
+            accuracy=0.7,
+            confidence=3,
+            natural_observation_matrix=True,
         )
 
         # --- word boundaries ---

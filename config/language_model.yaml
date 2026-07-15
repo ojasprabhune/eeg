@@ -4,7 +4,7 @@ vocab_size: 29
 num_layers: 4
 decoder_num_layers: 4
 num_heads: 4
-num_classes: 4
+num_classes: 5
 embedding_dim: 64
 decoder_embedding_dim: 64
 ffn_hidden_dim: 64
@@ -21,14 +21,12 @@ recon_lambda: 7
 
 device: cpu
 batch_size: 32
-warmup_steps: 4000
+warmup_steps: 10_000
 base_lr: 5e-5
-epochs: 100000
-start_steps: null
+epochs: 100_000
 
-run_name: lm_ss_recon_dec_pos_enc_l7
-# use_ckpt_path: /var/log/thavamount/eeg_ckpts/eeg_lm/eeg_llm.pth
-use_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/lm_ss_recon_dec_pos_enc_l7_epoch_48000.pth
-# use_ckpt_path: null
+run_name: lm
+# use_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/lm_ss_recon_dec_pos_enc_l7_epoch_10000.pth
+use_ckpt_path: null
 save_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/lm_ss_recon_dec_pos_enc_l7
 save_every: 5000

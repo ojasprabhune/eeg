@@ -8,9 +8,14 @@ import yaml
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from eeg.language_model import LanguageDataset, LanguageModel, LanguageTokenizer
+from eeg.language_model import (
+    LanguageDataset,
+    LanguageModel,
+    LanguageTokenizer,
+    compute_cer,
+    compute_wer,
+)
 from eeg.trie import Trie
-from eeg.viterbi_decoding import compute_cer, compute_wer
 
 with open("config/language_model.yaml", "r") as config_file:
     config = yaml.safe_load(config_file)
@@ -46,7 +51,6 @@ with open("config/language_model.yaml", "r") as config_file:
 trie = Trie()
 
 val_language_dataset = LanguageDataset(
-    features_sequences=torch.tensor(0),
     mode="val",
     print_shapes=True,
 )
@@ -58,6 +62,7 @@ model = LanguageModel(
     num_layers=num_layers,
     decoder_num_layers=decoder_num_layers,
     num_heads=num_heads,
+    num_inputs_classes=num_classes,
     embedding_dim=embedding_dim,
     decoder_embedding_dim=decoder_embedding_dim,
     ffn_hidden_dim=ffn_hidden_dim,
@@ -101,8 +106,8 @@ def validate(beam_width: int):
     all_word_lengths = []
 
     with torch.no_grad():
-        for i, (feature, feature_mask, label, label_mask, word_lengths) in enumerate(
-            tqdm(val_language_dataloader)
+        for feature, feature_mask, label, label_mask, word_lengths in tqdm(
+            val_language_dataloader
         ):
             feature: torch.Tensor = feature.to(device)
             feature_mask: torch.Tensor = feature_mask.to(device).bool()
@@ -123,8 +128,6 @@ def validate(beam_width: int):
                 tgt=in_label,
                 src_pad_mask=~in_feature_mask,  # flip because 1 should mean padding
                 tgt_pad_mask=~in_label_mask,
-                step=0,  # todo remove
-                return_epsilon=False,
             )  # out: (B, 1, vocab_size)
 
             # get logits for the first predicted token after <SOS>
@@ -164,7 +167,7 @@ def validate(beam_width: int):
             )
 
             # beam search loop
-            for step in range(1, seq_len):
+            for _ in range(1, seq_len):
                 # flatten the input sequences from (B, K, step) to (B * K, step)
                 decoder_input = path_backpointers.view(batch_size * beam_width, -1)
 
@@ -181,8 +184,6 @@ def validate(beam_width: int):
                     tgt=decoder_input,
                     src_pad_mask=~expanded_feature_mask,
                     tgt_pad_mask=~tgt_mask,
-                    step=0,  # todo remove
-                    return_epsilon=False,
                 )  # (B * K, current_seq_len, vocab_size)
 
                 # get logits for last token

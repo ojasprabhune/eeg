@@ -14,6 +14,8 @@ from tqdm import tqdm
 import wandb
 from eeg.language_model import LanguageDataset, LanguageModel
 
+# --- configuration -----------------------------------------------------------
+
 with open("config/language_model.yaml", "r") as config_file:
     config = yaml.safe_load(config_file)
 
@@ -33,28 +35,28 @@ with open("config/language_model.yaml", "r") as config_file:
     decoder_dropout = config["decoder_dropout"]
 
     recon_lambda = config["recon_lambda"]
-    pred_lambda = config["pred_lambda"]
 
     device = config["device"]
     batch_size = config["batch_size"]
     warmup_steps = config["warmup_steps"]
     base_lr = float(config["base_lr"])
     epochs = config["epochs"]
-    start_steps = config["start_steps"]
 
     run_name = config["run_name"]
     use_ckpt_path = config["use_ckpt_path"]
     save_ckpt_path = config["save_ckpt_path"]
     save_every = config["save_every"]
 
+# --- data --------------------------------------------------------------------
+
 train_language_dataset = LanguageDataset(
-    features_sequences=torch.tensor(0),
+    num_classes=num_classes,
     mode="train",
     print_shapes=True,
 )
 
 val_language_dataset = LanguageDataset(
-    features_sequences=torch.tensor(0),
+    num_classes=num_classes,
     mode="val",
     print_shapes=True,
 )
@@ -64,16 +66,21 @@ train_language_dataloader = DataLoader(
 )
 val_language_dataloader = DataLoader(val_language_dataset, batch_size=32, shuffle=False)
 
+# --- model -------------------------------------------------------------------
+
 model = LanguageModel(
     vocab_size=vocab_size,
     num_layers=num_layers,
     decoder_num_layers=decoder_num_layers,
     num_heads=num_heads,
+    num_inputs_classes=num_classes,
     decoder_embedding_dim=decoder_embedding_dim,
     ffn_hidden_dim=ffn_hidden_dim,
     encoder_dropout=encoder_dropout,
     decoder_dropout=decoder_dropout,
 ).to(device)
+
+# --- training ----------------------------------------------------------------
 
 optimizer = AdamW(model.parameters(), lr=base_lr, betas=(0.9, 0.98), eps=1e-9)
 ce_loss_fn = CrossEntropyLoss(ignore_index=0)  # ignore <PAD> token id
@@ -81,6 +88,8 @@ mse_loss_fn = MSELoss()
 
 param_count = sum(p.numel() for p in model.parameters() if p.requires_grad)
 print(f"Number of model parameters: {param_count:,}")
+
+# --- checkpoint --------------------------------------------------------------
 
 if use_ckpt_path is not None:
     state_dict = torch.load(use_ckpt_path, map_location=device)
@@ -90,6 +99,8 @@ if use_ckpt_path is not None:
     print(f"Loaded checkpoint from {use_ckpt_path}")
 else:
     start = 0
+
+# --- validation --------------------------------------------------------------
 
 
 def validate() -> tuple[float, float]:
@@ -103,10 +114,8 @@ def validate() -> tuple[float, float]:
     all_preds = []
     all_labels = []
 
-    val_iter_steps = 0
-
     with torch.no_grad():
-        for feature, feature_mask, label, label_mask in val_language_dataloader:
+        for feature, feature_mask, label, label_mask, _ in val_language_dataloader:
             feature = feature.to(device)
             feature_mask = feature_mask.to(device).bool()
             label = label.to(device).to(torch.int64)
@@ -127,8 +136,6 @@ def validate() -> tuple[float, float]:
                 tgt=in_label,
                 src_pad_mask=~in_feature_mask,  # flip because 1 should mean padding
                 tgt_pad_mask=~in_label_mask,
-                step=val_iter_steps,
-                return_epsilon=False,
             )  # out: (B, seq_len, vocab_size)
 
             label_logits = label_logits.transpose(1, 2)  # (B, vocab_size, seq_len)
@@ -147,12 +154,13 @@ def validate() -> tuple[float, float]:
             all_preds.append(preds.cpu())
             all_labels.append(gt_label.cpu())
 
-            val_iter_steps += 1
-
     model.train()
     avg_loss = total_loss / max(total, 1)
     accuracy = correct / max(total, 1)
     return avg_loss, accuracy
+
+
+# --- training ----------------------------------------------------------------
 
 
 def train():
@@ -171,14 +179,12 @@ def train():
     wandb.log({"param_count": param_count})
     model.train()
 
-    iteration_steps = start_steps if start_steps is not None else 0
-
     epoch_tqdm = tqdm(range(start, epochs), dynamic_ncols=True)
     for i in epoch_tqdm:
         epoch_tqdm.set_description(f"Epoch {i + 1}")
 
         iter_tqdm = tqdm(train_language_dataloader, dynamic_ncols=True)
-        for feature, feature_mask, label, label_mask in iter_tqdm:
+        for feature, feature_mask, label, label_mask, _ in iter_tqdm:
             feature = feature.to(device)
             feature_mask = feature_mask.to(device).bool()
             label = label.to(device).to(torch.int64)
@@ -192,13 +198,11 @@ def train():
             gt_feature = feature[:, 1:, :]
             gt_label = label[:, 1:]
 
-            label_logits, recon, epsilon = model(
+            label_logits, recon = model(
                 src=in_feature,
                 tgt=in_label,
                 src_pad_mask=~in_feature_mask,  # flip because 1 should mean padding
                 tgt_pad_mask=~in_label_mask,
-                step=iteration_steps,
-                return_epsilon=True,
             )  # out: (B, seq_len, vocab_size)
 
             label_logits = label_logits.transpose(1, 2)  # (B, vocab_size, seq_len)
@@ -212,13 +216,10 @@ def train():
             run.log({"loss": loss.item()})
             run.log({"letter loss": loss_letters.item()})
             run.log({"recon loss": loss_recon.item()})
-            run.log({"epsilon": epsilon})
 
             optimizer.zero_grad()  # optimizer has access to all model params, makes grads 0
             loss.backward()  # calculates and adds gradients to params so optim sees
             optimizer.step()  # optim looks at gradients and steps accordingly
-
-            iteration_steps += 1
 
         val_loss, val_acc = validate()
         epoch_tqdm.set_postfix(
@@ -240,14 +241,14 @@ def train():
 
     run.finish()
 
+    latest_ckpt = {
+        "epochs": epochs,
+        "model": model.state_dict(),
+        "optimizer": optimizer.state_dict(),
+    }
+
+    if save_ckpt_path is not None:
+        torch.save(latest_ckpt, save_ckpt_path)
+
 
 train()
-
-latest_ckpt = {
-    "epochs": epochs,
-    "model": model.state_dict(),
-    "optimizer": optimizer.state_dict(),
-}
-
-if save_ckpt_path is not None:
-    torch.save(latest_ckpt, save_ckpt_path)
