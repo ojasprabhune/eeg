@@ -10,6 +10,7 @@ from tqdm import tqdm
 
 from eeg.language_model import LanguageDataset, LanguageModel, LanguageTokenizer
 from eeg.trie import Trie
+from eeg.viterbi_decoding import compute_cer, compute_wer
 
 with open("config/language_model.yaml", "r") as config_file:
     config = yaml.safe_load(config_file)
@@ -71,6 +72,22 @@ if use_ckpt_path is not None:
     model.load_state_dict(state_dict["model"])
 
 
+def words_from_lengths(sentence: str, lengths: list[int]) -> list[str]:
+    """
+    Splits a flat, space-free sentence string into a list of words using the
+    given word lengths, in order. Used to recover word boundaries for both
+    the true and predicted letter strings, since neither has spaces in it.
+    """
+    words = []
+    idx = 0
+
+    for length in lengths:
+        words.append(sentence[idx : idx + length])
+        idx += length
+
+    return words
+
+
 def validate(beam_width: int):
     """
     Run passes over the validation set and use beam search and tri-based
@@ -81,9 +98,10 @@ def validate(beam_width: int):
 
     all_predictions = []
     all_labels = []
+    all_word_lengths = []
 
     with torch.no_grad():
-        for i, (feature, feature_mask, label, label_mask) in enumerate(
+        for i, (feature, feature_mask, label, label_mask, word_lengths) in enumerate(
             tqdm(val_language_dataloader)
         ):
             feature: torch.Tensor = feature.to(device)
@@ -105,6 +123,8 @@ def validate(beam_width: int):
                 tgt=in_label,
                 src_pad_mask=~in_feature_mask,  # flip because 1 should mean padding
                 tgt_pad_mask=~in_label_mask,
+                step=0,  # todo remove
+                return_epsilon=False,
             )  # out: (B, 1, vocab_size)
 
             # get logits for the first predicted token after <SOS>
@@ -161,6 +181,8 @@ def validate(beam_width: int):
                     tgt=decoder_input,
                     src_pad_mask=~expanded_feature_mask,
                     tgt_pad_mask=~tgt_mask,
+                    step=0,  # todo remove
+                    return_epsilon=False,
                 )  # (B * K, current_seq_len, vocab_size)
 
                 # get logits for last token
@@ -249,13 +271,40 @@ def validate(beam_width: int):
 
             all_predictions.extend(predictions)
             all_labels.extend(label)
+            all_word_lengths.extend(word_lengths)
 
-    for pred_sequence, label_sequence in zip(all_predictions, all_labels):
+    total_cer = 0.0
+    total_wer = 0.0
+    num_sentences = 0
+
+    for pred_sequence, label_sequence, sentence_word_lengths in zip(
+        all_predictions, all_labels, all_word_lengths
+    ):
         decoded_pred = tokenizer.decode(pred_sequence)
         decoded_labels = tokenizer.decode(label_sequence)
 
-        print(decoded_pred)
-        print(f"{decoded_labels}\n")
+        pred_sentence = decoded_pred[0]
+        true_sentence = decoded_labels[0]
+
+        # strip the zero-padding off the word length row to get the real
+        # word boundaries for this sentence
+        lengths = [
+            int(length.item()) for length in sentence_word_lengths if length.item() > 0
+        ]
+
+        true_words = words_from_lengths(true_sentence, lengths)
+        pred_words = words_from_lengths(pred_sentence, lengths)
+
+        print(pred_words)
+        print(true_words)
+        print()
+
+        total_cer += compute_cer(pred_sentence, true_sentence)
+        total_wer += compute_wer(pred_words, true_words)
+        num_sentences += 1
+
+    print(f"Average CER: {total_cer / max(num_sentences, 1):.2f}")
+    print(f"Average WER: {total_wer / max(num_sentences, 1):.2f}")
 
 
 validate(beam_width=5)

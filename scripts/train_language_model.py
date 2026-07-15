@@ -33,12 +33,14 @@ with open("config/language_model.yaml", "r") as config_file:
     decoder_dropout = config["decoder_dropout"]
 
     recon_lambda = config["recon_lambda"]
+    pred_lambda = config["pred_lambda"]
 
     device = config["device"]
     batch_size = config["batch_size"]
     warmup_steps = config["warmup_steps"]
     base_lr = float(config["base_lr"])
     epochs = config["epochs"]
+    start_steps = config["start_steps"]
 
     run_name = config["run_name"]
     use_ckpt_path = config["use_ckpt_path"]
@@ -120,7 +122,7 @@ def validate() -> tuple[float, float]:
             gt_feature = feature[:, 1:, :]
             gt_label = label[:, 1:]
 
-            label_logits, recon, enc_letters = model(
+            label_logits, recon = model(
                 src=in_feature,
                 tgt=in_label,
                 src_pad_mask=~in_feature_mask,  # flip because 1 should mean padding
@@ -169,7 +171,7 @@ def train():
     wandb.log({"param_count": param_count})
     model.train()
 
-    iteration_steps = 0
+    iteration_steps = start_steps if start_steps is not None else 0
 
     epoch_tqdm = tqdm(range(start, epochs), dynamic_ncols=True)
     for i in epoch_tqdm:
@@ -190,7 +192,7 @@ def train():
             gt_feature = feature[:, 1:, :]
             gt_label = label[:, 1:]
 
-            label_logits, recon, enc_letters, epsilon = model(
+            label_logits, recon, epsilon = model(
                 src=in_feature,
                 tgt=in_label,
                 src_pad_mask=~in_feature_mask,  # flip because 1 should mean padding
@@ -199,7 +201,7 @@ def train():
                 return_epsilon=True,
             )  # out: (B, seq_len, vocab_size)
 
-            label_logits = label_logits.transpose(1, 2)
+            label_logits = label_logits.transpose(1, 2)  # (B, vocab_size, seq_len)
 
             loss_letters = ce_loss_fn(label_logits, gt_label)
             loss_recon = mse_loss_fn(recon, gt_feature)
@@ -207,12 +209,13 @@ def train():
             loss = loss_letters + recon_lambda * loss_recon
 
             iter_tqdm.set_postfix({"loss": loss.item()})
+            run.log({"loss": loss.item()})
             run.log({"letter loss": loss_letters.item()})
             run.log({"recon loss": loss_recon.item()})
             run.log({"epsilon": epsilon})
 
             optimizer.zero_grad()  # optimizer has access to all model params, makes grads 0
-            loss_letters.backward()  # calculates and adds gradients to params so optim sees
+            loss.backward()  # calculates and adds gradients to params so optim sees
             optimizer.step()  # optim looks at gradients and steps accordingly
 
             iteration_steps += 1

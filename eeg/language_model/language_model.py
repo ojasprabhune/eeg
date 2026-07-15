@@ -67,12 +67,12 @@ class LanguageModel(nn.Module):
 
         self.vocab_projection = nn.Linear(embedding_dim, vocab_size)
 
-        # --- task 2: enc -> letter -------------------------------------------
-        self.letterffn1 = nn.Linear(embedding_dim, vocab_size)
-
-        # --- task 3: enc recon -----------------------------------------------
+        # --- task 2: enc recon -----------------------------------------------
         self.reconffn1 = nn.Linear(embedding_dim, embedding_dim)
         self.reconffn2 = nn.Linear(embedding_dim, num_inputs_classes)
+
+        # todo remove
+        self.letterffn1 = nn.Linear(embedding_dim, vocab_size)
 
     def get_epsilon(
         self, step: int, k: int = 1000, schedule_type: str = "inverse_sigmoid"
@@ -95,12 +95,9 @@ class LanguageModel(nn.Module):
         tgt: torch.Tensor,
         src_pad_mask: torch.Tensor,
         tgt_pad_mask: torch.Tensor,
-        step: int,
+        step: int,  # unused for now
         return_epsilon: bool,
-    ) -> (
-        tuple[torch.Tensor, torch.Tensor, torch.Tensor, float]
-        | tuple[torch.Tensor, torch.Tensor, torch.Tensor]
-    ):
+    ) -> tuple[torch.Tensor, torch.Tensor, float] | tuple[torch.Tensor, torch.Tensor]:
 
         src = self.linear_projection(src)  # (B, T_in, C) -> (B, T_in, embedding_dim)
         src = self.pos_enc(src)
@@ -113,6 +110,8 @@ class LanguageModel(nn.Module):
         tgt_emb = self.decoder_embedding(tgt) * math.sqrt(
             self.embedding_dim
         )  # (B, T, C)
+
+        tgt_emb = self.pos_enc(tgt_emb)
 
         tgt_mask = nn.Transformer.generate_square_subsequent_mask(
             tgt_emb.size(1), device=tgt_emb.device
@@ -133,7 +132,8 @@ class LanguageModel(nn.Module):
             predictions = torch.argmax(logits_p1, dim=-1)  # (B, T)
 
         # --- mixing step ---
-        epsilon = self.get_epsilon(step=step, k=4000)  # get epsilon
+        # epsilon = self.get_epsilon(step=step, k=4000)  # get epsilon
+        epsilon = 0.0  # currently using only autoregressive training
 
         # fill a tensor of shape (B, T) of all epsilon values, then coin flip all
         coin_flips = torch.bernoulli(
@@ -160,6 +160,8 @@ class LanguageModel(nn.Module):
             self.embedding_dim
         )  # (B, T, C)
 
+        tgt_emb = self.pos_enc(tgt_emb)
+
         # --- pass 2: prediction ---
         pred = self.decoder(
             tgt_emb,
@@ -172,17 +174,9 @@ class LanguageModel(nn.Module):
 
         logits_p2: torch.Tensor = self.vocab_projection(pred)  # (B, T, vocab_size)
 
-        # --- task 2: enc -> letter -------------------------------------------
-        # currently unused
-        enc_letters = self.letterffn1(memory)  # (B, T, vocab_size)
-
-        # --- task 3: enc recon -----------------------------------------------
+        # --- task 2: enc recon -----------------------------------------------
         recon = self.reconffn1(memory)  # (B, T, C)
         recon = self.relu(recon)
         recon: torch.Tensor = self.reconffn2(recon)  # (B, T, 4)
 
-        return (
-            (logits_p2, recon, enc_letters, epsilon)
-            if return_epsilon
-            else (logits_p2, recon, enc_letters)
-        )
+        return (logits_p2, recon, epsilon) if return_epsilon else (logits_p2, recon)
