@@ -48,3 +48,32 @@ class Trie:
                 return []
             node = node.children[char]
         return list(node.children.keys())
+
+    def __str__(self) -> str:
+        lines = ["Trie", "└── ROOT"]
+
+        def _build(node: TrieNode, prefix="", is_last=True, char=""):
+            connector = "└── " if is_last else "├── "
+
+            if char:
+                marker = " (word)" if node.is_word else ""
+                lines.append(prefix + connector + char + marker)
+
+            children = list(node.children.items())
+
+            for i, (child_char, child_node) in enumerate(children):
+                last = i == len(children) - 1
+
+                if char:
+                    new_prefix = prefix + ("    " if is_last else "│   ")
+                else:
+                    new_prefix = prefix
+
+                _build(child_node, new_prefix, last, child_char)
+
+        children = list(self.root.children.items())
+
+        for i, (char, node) in enumerate(children):
+            _build(node, "", i == len(children) - 1, char)
+
+        return "\n".join(lines)

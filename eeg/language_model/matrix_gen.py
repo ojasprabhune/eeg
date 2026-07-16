@@ -267,3 +267,19 @@ def reconstruct_words(pred_str: str, gt_words: list[str]) -> list[str]:
         idx += len(word)
 
     return pred_words
+
+
+def words_from_lengths(sentence: str, lengths: list[int]) -> list[str]:
+    """
+    Splits a flat, space-free sentence string into a list of words using the
+    given word lengths, in order. Used to recover word boundaries for both
+    the true and predicted letter strings, since neither has spaces in it.
+    """
+    words = []
+    idx = 0
+
+    for length in lengths:
+        words.append(sentence[idx : idx + length])
+        idx += length
+
+    return words

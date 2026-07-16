@@ -5,6 +5,7 @@ import torch
 from torch.utils.data import Dataset
 
 from eeg.gesture2hand import Colors
+from eeg.trie import Trie
 
 from .matrix_gen import make_placeholder_feature_sequences
 from .tokenizer import LanguageTokenizer
@@ -45,7 +46,7 @@ class LanguageDataset(Dataset):
         super().__init__()
 
         # --- sentences ---
-        language_tokenizer = LanguageTokenizer()
+        self.language_tokenizer = LanguageTokenizer()
 
         sentences_file = open(f"{label_sentence_path}150sentences.txt", "r")
         sentences = sentences_file.readlines()
@@ -76,8 +77,15 @@ class LanguageDataset(Dataset):
                 word_lengths[i, j] = len(word)
 
         sentences = [re.sub(r"[^a-z]", "", sentence.lower()) for sentence in sentences]
-        labels = language_tokenizer.encode(sentences)
+        labels = self.language_tokenizer.encode(sentences)
         label_masks = (labels != 0).type(torch.int)
+
+        # --- trie construction ---
+        self.trie = Trie()
+
+        for sentence in words_per_sentence:
+            for word in sentence:
+                self.trie.insert(word)
 
         if print_shapes:
             print(f"{Colors.OKGREEN}Features shape: {features.shape}{Colors.ENDC}")

@@ -8,6 +8,7 @@ from .matrix_gen import (
     make_placeholder_feature_sequences,
     reconstruct_words,
     sequence_to_letters,
+    words_from_lengths,
 )
 from .metrics import compute_cer, compute_wer
 from .tokenizer import LanguageTokenizer

@@ -31,11 +31,15 @@ min_value: 0.1
 k: 55_555
 
 # checkpoints
-run_name: lm
+run_name: lm_5c
 save_every: 5000
 
 # save_ckpt_path: null
-save_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/lm
+save_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/lm_5c
 
 use_ckpt_path: null
-# use_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/lm
+# use_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/lm_5c_epoch_30000.pth
+
+# inference
+
+beam_width: 15

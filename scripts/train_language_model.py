@@ -98,7 +98,7 @@ ce_loss_fn = CrossEntropyLoss(ignore_index=0)  # ignore <PAD> token id
 mse_loss_fn = MSELoss()
 
 param_count = sum(p.numel() for p in model.parameters() if p.requires_grad)
-print(f"Number of model parameters: {param_count:,}")
+print(f"\nNumber of model parameters: {param_count:,}\n")
 
 # --- checkpoint --------------------------------------------------------------
 
@@ -242,8 +242,6 @@ def train():
                     "recon loss": loss_recon.item(),
                     "epsilon": epsilon,
                 },
-                step=step,
-                commit=False,
             )
 
             optimizer.zero_grad()  # optimizer has access to all model params, makes grads 0
@@ -265,7 +263,6 @@ def train():
                 "val_acc": val_acc,
                 "epoch": i + 1,
             },
-            step=step,
         )
 
         if (i + 1) % save_every == 0 and save_ckpt_path is not None:
