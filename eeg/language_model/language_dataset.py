@@ -53,7 +53,7 @@ class LanguageDataset(Dataset):
             sentences,
             num_classes=num_classes,
             correct_mean=0.9,
-            accuracy=0.7,
+            accuracy=1,
             confidence=3,
             natural_observation_matrix=True,
         )

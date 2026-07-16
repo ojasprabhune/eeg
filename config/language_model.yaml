@@ -28,14 +28,14 @@ epochs: 50_000
 # scheduled sampling
 
 min_value: 0.1
-k: 300_000
+k: 30_000
 
 # checkpoints
 run_name: lm
-save_every: 5000
+save_every: 1000
 
-# use_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/lm_ss_recon_dec_pos_enc_l7_epoch_10000.pth
-# save_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/lm
+# use_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/lm_ss_recon_dec_pos_enc_l7_epoch_500
+save_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/lm_epoch_36000.pth
 
 use_ckpt_path: null
-save_ckpt_path: null
+# save_ckpt_path: null
