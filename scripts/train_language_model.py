@@ -151,6 +151,7 @@ def validate() -> tuple[float, float]:
                 tgt_pad_mask=~in_label_mask,
                 step=step,
                 return_epsilon=False,
+                use_scheduled_sampling=False,  # clean teacher-forced eval, no mixing
             )  # out: (B, seq_len, vocab_size)
 
             label_logits = label_logits.transpose(1, 2)  # (B, vocab_size, seq_len)
@@ -240,7 +241,9 @@ def train():
                     "letter loss": loss_letters.item(),
                     "recon loss": loss_recon.item(),
                     "epsilon": epsilon,
-                }
+                },
+                step=step,
+                commit=False,
             )
 
             optimizer.zero_grad()  # optimizer has access to all model params, makes grads 0
@@ -261,7 +264,8 @@ def train():
                 "val_loss": val_loss,
                 "val_acc": val_acc,
                 "epoch": i + 1,
-            }
+            },
+            step=step,
         )
 
         if (i + 1) % save_every == 0 and save_ckpt_path is not None:

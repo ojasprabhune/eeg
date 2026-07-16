@@ -99,7 +99,7 @@ def words_from_lengths(sentence: str, lengths: list[int]) -> list[str]:
     return words
 
 
-def beam_search_validate(beam_width: int):
+def beam_search_validate(beam_width: int, print_sequences: bool):
     """
     Validates language model using beam search inference.
     """
@@ -137,6 +137,7 @@ def beam_search_validate(beam_width: int):
                 tgt_pad_mask=~in_label_mask,
                 step=step,
                 return_epsilon=False,
+                use_scheduled_sampling=False,
             )  # out: (B, 1, vocab_size)
 
             step += 1
@@ -197,6 +198,7 @@ def beam_search_validate(beam_width: int):
                     tgt_pad_mask=~tgt_mask,
                     step=step,
                     return_epsilon=False,
+                    use_scheduled_sampling=False,
                 )  # (B * K, current_seq_len, vocab_size)
 
                 # get logits for last token
@@ -311,19 +313,21 @@ def beam_search_validate(beam_width: int):
         true_words = words_from_lengths(true_sentence, lengths)
         pred_words = words_from_lengths(pred_sentence, lengths)
 
-        print(pred_words)
-        print(true_words)
-        print()
+        if print_sequences:
+            print(pred_words)
+            print(true_words)
+            print()
 
         total_cer += compute_cer(pred_sentence, true_sentence)
         total_wer += compute_wer(pred_words, true_words)
         num_sentences += 1
 
+    print("\n---- beam search validation ----")
     print(f"Average CER: {total_cer / max(num_sentences, 1):.2f}")
-    print(f"Average WER: {total_wer / max(num_sentences, 1):.2f}")
+    print(f"Average WER: {total_wer / max(num_sentences, 1):.2f}\n")
 
 
-def regular_validate(sample_strategy: str, temperature: float):
+def regular_validate(sample_strategy: str, temperature: float, print_sequences: bool):
     """
     Validates language model using autoregressive decoding and regalar sampling
     strategies.
@@ -362,7 +366,7 @@ def regular_validate(sample_strategy: str, temperature: float):
 
             finished = torch.zeros(batch_size, dtype=torch.bool, device=device)
 
-            for _ in range(seq_len):
+            for _ in range(seq_len - 1):
                 label_logits, _ = model(
                     src=in_feature,
                     tgt=predictions,
@@ -370,6 +374,7 @@ def regular_validate(sample_strategy: str, temperature: float):
                     tgt_pad_mask=~prediction_mask,
                     step=step,
                     return_epsilon=False,
+                    use_scheduled_sampling=False,
                 )
 
                 # get logits for the next predicted token
@@ -409,16 +414,13 @@ def regular_validate(sample_strategy: str, temperature: float):
                 # update finished status
                 finished |= next_token.eq(2)
 
-                if finished.all():
-                    break
-
                 step += 1
 
             # remove the initial <SOS> so predictions align with gt labels
             predictions = predictions[:, 1:]
             valid = label_mask[:, 1:]
 
-            correct += ((predictions[:, 1:] == label[:, 1:]) & valid).sum().item()
+            correct += ((predictions == label[:, 1:]) & valid).sum().item()
             total += valid.sum().item()
 
             all_predictions.extend(predictions)  # remove <SOS>
@@ -445,9 +447,10 @@ def regular_validate(sample_strategy: str, temperature: float):
         true_words = words_from_lengths(true_sentence, lengths)
         pred_words = words_from_lengths(pred_sentence, lengths)
 
-        print(pred_words)
-        print(true_words)
-        print()
+        if print_sequences:
+            print(pred_words)
+            print(true_words)
+            print()
 
         total_cer += compute_cer(pred_sentence, true_sentence)
         total_wer += compute_wer(pred_words, true_words)
@@ -455,10 +458,11 @@ def regular_validate(sample_strategy: str, temperature: float):
 
     accuracy = correct / max(total, 1)
 
+    print("\n---- regular validation ----")
     print(f"Accuracy: {accuracy:.2%}")
     print(f"Average CER: {total_cer / max(num_sentences, 1):.2f}")
-    print(f"Average WER: {total_wer / max(num_sentences, 1):.2f}")
+    print(f"Average WER: {total_wer / max(num_sentences, 1):.2f}\n")
 
 
-# beam_search_validate(beam_width=7)
-regular_validate(sample_strategy="greedy", temperature=1)
+regular_validate(sample_strategy="greedy", temperature=1, print_sequences=False)
+beam_search_validate(beam_width=5, print_sequences=False)

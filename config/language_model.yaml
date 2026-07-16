@@ -23,19 +23,19 @@ device: cpu
 batch_size: 32
 warmup_steps: 10_000
 base_lr: 5.0e-5
-epochs: 50_000
+epochs: 150_000
 
 # scheduled sampling
 
 min_value: 0.1
-k: 30_000
+k: 55_555
 
 # checkpoints
 run_name: lm
-save_every: 1000
+save_every: 5000
 
-# use_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/lm_ss_recon_dec_pos_enc_l7_epoch_500
-save_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/lm_epoch_36000.pth
+# save_ckpt_path: null
+save_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/lm
 
 use_ckpt_path: null
-# save_ckpt_path: null
+# use_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/lm

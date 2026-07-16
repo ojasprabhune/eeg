@@ -32,11 +32,11 @@ class LanguageDataset(Dataset):
 
         if mode == "train":
             print(
-                f"{Colors.HEADER}{Colors.BOLD}Initializing training dataset...{Colors.ENDC}"
+                f"\n{Colors.HEADER}{Colors.BOLD}Initializing training dataset...{Colors.ENDC}"
             )
         else:
             print(
-                f"{Colors.HEADER}{Colors.BOLD}Initializing validation dataset...{Colors.ENDC}"
+                f"\n{Colors.HEADER}{Colors.BOLD}Initializing validation dataset...{Colors.ENDC}"
             )
         self.print_shapes = print_shapes
         self.device = device
@@ -113,7 +113,9 @@ class LanguageDataset(Dataset):
         self.val_word_lengths = self.word_lengths[self.split_idx :, :]
 
         if print_shapes:
-            print(f"{Colors.WARNING}Number of sequences: {self.__len__()}{Colors.ENDC}")
+            print(
+                f"{Colors.WARNING}Number of sequences: {self.__len__()}{Colors.ENDC}\n"
+            )
 
     def __len__(self) -> int:
         return (
