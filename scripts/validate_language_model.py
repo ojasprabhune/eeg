@@ -835,8 +835,8 @@ def beam_trie_validate(beam_width: int, print_sequences: bool, print_words: bool
 validate(
     sample_strategy="greedy",
     temperature=1,
-    print_sequences=False,
-    print_words=False,
+    print_sequences=True,
+    print_words=True,
 )
 beam_search_validate(
     beam_width=beam_width,

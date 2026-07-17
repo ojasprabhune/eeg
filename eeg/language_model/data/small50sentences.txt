@@ -1,0 +1,50 @@
+i see a tree
+it is a tree
+a tree is near a stone
+i see a stone
+it is a stone
+a stone is near a tree
+i see one nest
+a nest is in a tree
+it is a nest to one
+one nest is in one tree
+i see tea
+tea is on a stone
+i sit on a stone
+sit on a seat
+i sit in a seat
+a seat is near a tree
+a seat is near a stone
+it is near a nest
+a nest is on a stone
+i sit to eat
+i eat one
+i eat on a seat
+i eat in a tree
+no i sit to eat
+it is not tea
+is it a tree
+is it a stone
+is it tea
+are i in a tree
+are i near a nest
+it is on one tree
+it is in one nest
+one stone is near
+one tree is near
+sit on one stone
+sit in one nest
+i see a seat
+eat tea on a seat
+no not a stone
+i eat not a stone
+i see not one nest
+i see no tree
+i see no seat
+are a seat near a tree
+a stone is not a seat
+a tree is not a stone
+a nest is not tea
+tea is to eat
+no tea is near
+it is near a seat

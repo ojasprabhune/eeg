@@ -48,7 +48,7 @@ class LanguageDataset(Dataset):
         # --- sentences ---
         self.language_tokenizer = LanguageTokenizer()
 
-        sentences_file = open(f"{label_sentence_path}150sentences.txt", "r")
+        sentences_file = open(f"{label_sentence_path}small50sentences.txt", "r")
         sentences = sentences_file.readlines()
         features, feature_masks = make_placeholder_feature_sequences(
             sentences,

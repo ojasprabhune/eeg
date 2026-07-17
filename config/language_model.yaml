@@ -4,7 +4,7 @@ vocab_size: 29
 num_layers: 4
 decoder_num_layers: 4
 num_heads: 4
-num_classes: 5
+num_classes: 4
 embedding_dim: 64
 decoder_embedding_dim: 64
 ffn_hidden_dim: 64
@@ -31,14 +31,15 @@ min_value: 0.1
 k: 55_555
 
 # checkpoints
-run_name: lm_5c
+run_name: lm_4c_8l_09acc
 save_every: 5000
 
 # save_ckpt_path: null
-save_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/lm_5c
+save_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/lm_4c_8l_09acc
 
-use_ckpt_path: null
-# use_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/lm_5c_epoch_30000.pth
+# use_ckpt_path: null
+# use_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/lm_5c_epoch_15000.pth
+use_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/lm_4c_8l_epoch_25000.pth
 
 # inference
 
