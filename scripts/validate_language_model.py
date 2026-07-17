@@ -8,6 +8,7 @@ import yaml
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from eeg.gesture2hand import Colors
 from eeg.language_model import (
     LanguageDataset,
     LanguageModel,
@@ -57,6 +58,12 @@ with open("config/language_model.yaml", "r") as config_file:
     save_every = config["save_every"]
 
     beam_width = config["beam_width"]
+
+print("\n----------------------------------------------------------------------")
+print(f"{Colors.BOLD}{Colors.HEADER}RUN NAME: {run_name}{Colors.ENDC}")
+print(f"{Colors.BOLD}{Colors.HEADER}USING CHECKPOINT:{Colors.ENDC}")
+print(use_ckpt_path)
+print("------------------------------------------------------------------------")
 
 # =============================================================================
 # DATA
@@ -840,11 +847,11 @@ validate(
 )
 beam_search_validate(
     beam_width=beam_width,
-    print_sequences=False,
-    print_words=False,
+    print_sequences=True,
+    print_words=True,
 )
 beam_trie_validate(
     beam_width=beam_width,
-    print_sequences=False,
-    print_words=False,
+    print_sequences=True,
+    print_words=True,
 )
