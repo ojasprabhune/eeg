@@ -1,1 +1,1 @@
-from .gestures import gesture_classes, get_gesture_class
+from .gestures import gesture_experiments, get_gesture_class
