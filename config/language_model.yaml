@@ -1,4 +1,4 @@
-# language_model
+# --- language_model ----------------------------
 
 vocab_size: 29
 num_layers: 4
@@ -17,32 +17,32 @@ decoder_dropout: 0.1
 
 recon_lambda: 7
 
-# training
+# --- training ----------------------------------
 
 device: cpu
 batch_size: 32
 warmup_steps: 10_000
 base_lr: 5.0e-5
 epochs: 150_000
+experiment_name: common_8_letters
 
-# scheduled sampling
+# --- scheduled sampling ------------------------
 
 min_value: 0.1
 k: 55_555
 
-# checkpoints
+# --- checkpoints -------------------------------
+#
 run_name: lm_4c_8l
 # run_name: lm_5c
 save_every: 5000
 
-# save_ckpt_path: null
-save_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/lm_5c
-# save_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/lm_4c_8l
+save_ckpt_path: null
+# save_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/
 
-# use_ckpt_path: null
-# use_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/lm_5c_epoch_25000.pth
-use_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/lm_4c_8l_epoch_30000.pth
+use_ckpt_path: null
+# use_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/lm/
 
-# inference
+# --- inference ---------------------------------
 
-beam_width: 15
+beam_width: 1

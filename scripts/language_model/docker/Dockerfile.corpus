@@ -1,0 +1,19 @@
+# CUDA image for generating AAC corpora on an Azure Container Apps serverless
+# A100 GPU job. Kept minimal: only torch (from base) + transformers + the blob
+# SDK, plus the two dependency-free repo modules vendored in as top-level files.
+FROM pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir "transformers>=5.0" accelerate azure-storage-blob
+
+COPY scripts/language_model/corpus_gen.py /app/corpus_gen.py
+COPY eeg/gesture2hand/utils/gestures.py /app/gestures.py
+COPY eeg/trie/trie.py /app/trie.py
+
+ENV HF_HOME=/app/hf
+ENV CORPUS_OUTPUT_DIR=/app/out
+ENV CORPUS_DEVICE=cuda
+RUN mkdir -p /app/out
+
+CMD ["python", "corpus_gen.py", "asl_8_letters", "common_8_letters", "6_letters"]

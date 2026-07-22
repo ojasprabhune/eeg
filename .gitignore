@@ -13,3 +13,5 @@ out/
 data/dataset/
 **wandb/*
 .envrc
+
+scripts/bionic_hand/Demo/

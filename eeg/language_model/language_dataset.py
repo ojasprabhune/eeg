@@ -1,3 +1,4 @@
+import os
 import re
 
 import numpy as np
@@ -11,6 +12,54 @@ from .matrix_gen import make_placeholder_feature_sequences
 from .tokenizer import LanguageTokenizer
 
 
+def load_experiment_corpus(
+    base_path: str, experiment: str, max_sentences: int = 500
+) -> list[str]:
+    """
+    Load and filter an experiment's corpus (see scripts/language_model/set.py).
+
+    Corpora live in <base_path>/<experiment>/set_<N>/<experiment>.txt with a
+    sibling words.txt vocab; the highest-numbered set_<N> is used. Sentences are
+    de-duplicated, kept only if every word is in the vocab, and capped at
+    max_sentences. Falls back to the legacy flat files if no set folder exists.
+    """
+    exp_dir = os.path.join(base_path, experiment)
+
+    sets = []
+    if os.path.isdir(exp_dir):
+        for name in os.listdir(exp_dir):
+            match = re.fullmatch(r"set_(\d+)", name)
+            if match:
+                sets.append((int(match.group(1)), name))
+
+    if sets:
+        _, set_name = max(sets)
+        set_dir = os.path.join(exp_dir, set_name)
+        with open(os.path.join(set_dir, f"{experiment}.txt")) as file:
+            raw = [line.strip() for line in file if line.strip()]
+        with open(os.path.join(set_dir, "words.txt")) as file:
+            vocab_text = file.read()
+        vocab = {w.strip().lower() for w in vocab_text.split(",") if w.strip()}
+
+        seen, filtered = set(), []
+        for sentence in raw:  # dedup preserving order
+            if sentence in seen:
+                continue
+            seen.add(sentence)
+            words = re.findall(r"[a-z]+", sentence.lower())
+            if words and all(word in vocab for word in words):
+                filtered.append(sentence)
+        return filtered[:max_sentences]
+
+    # fallbacks: legacy flat corpus, then the tiny hand-written one
+    legacy = os.path.join(base_path, f"{experiment}_corpus.txt")
+    if os.path.exists(legacy):
+        with open(legacy) as file:
+            return [line.strip() for line in file if line.strip()]
+    with open(os.path.join(base_path, "small50sentences.txt")) as file:
+        return [line.strip() for line in file if line.strip()]
+
+
 class LanguageDataset(Dataset):
     """
     Dataset for loading the outputs of the EEG classifier as inputs for
@@ -20,10 +69,12 @@ class LanguageDataset(Dataset):
     def __init__(
         self,
         num_classes: int,
+        experiment: str,
         mode: str = "train",
         label_sentence_path: str = "eeg/language_model/data/",
         device: str = "cuda",
         print_shapes: bool = False,
+        accuracy: float = 1.0,
     ) -> None:
         """
         Input is a list of feature sequences, each of shape (T, 4), and the
@@ -33,11 +84,11 @@ class LanguageDataset(Dataset):
 
         if mode == "train":
             print(
-                f"\n{Colors.HEADER}{Colors.BOLD}Initializing training dataset...{Colors.ENDC}"
+                f"{Colors.HEADER}{Colors.BOLD}=== Initializing training dataset... ==={Colors.ENDC}"
             )
         else:
             print(
-                f"\n{Colors.HEADER}{Colors.BOLD}Initializing validation dataset...{Colors.ENDC}"
+                f"{Colors.HEADER}{Colors.BOLD}=== Initializing validation dataset... ==={Colors.ENDC}"
             )
         self.print_shapes = print_shapes
         self.device = device
@@ -48,18 +99,17 @@ class LanguageDataset(Dataset):
         # --- sentences ---
         self.language_tokenizer = LanguageTokenizer()
 
-        # used for 26 letters
-        # sentences_file = open(f"{label_sentence_path}150sentences.txt", "r")
+        # load + filter the corpus for this experiment (dedup, keep only
+        # sentences whose words are all in the experiment vocab, cap at 500)
+        sentences = load_experiment_corpus(label_sentence_path, experiment)
 
-        # used for 8 most common letters
-        sentences_file = open(f"{label_sentence_path}small50sentences.txt", "r")
-
-        sentences = sentences_file.readlines()
+        self.accuracy = accuracy
         features, feature_masks = make_placeholder_feature_sequences(
-            sentences,
+            sentences=sentences,
+            experiment=experiment,
             num_classes=num_classes,
             correct_mean=0.9,
-            accuracy=1,
+            accuracy=accuracy,
             confidence=3,
             natural_observation_matrix=True,
         )

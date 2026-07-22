@@ -1,0 +1,470 @@
+i see it
+i see a tree
+i see one
+see a tree
+eat
+eat it
+eat one
+eat in
+eat on a stone
+sit
+sit in
+sit on it
+sit on a stone
+sit on one
+sit in a seat
+sit on a seat
+are i in
+are i on it
+are it on
+are it in
+is it
+is it on
+is it in
+is it a tree
+is it a stone
+is it a nest
+is it a seat
+is one in
+is one on it
+no
+no tea
+no sea
+no tree
+no stone
+no seat
+not it
+not one
+not in
+not on
+not a tree
+not a stone
+tea
+tea to eat
+tea on a stone
+sea
+sea to see
+sea or tree
+tree
+tree in a sea
+tree on a stone
+stone
+stone in a sea
+stone on a tree
+nest
+nest in a tree
+nest on a tree
+seat
+seat on a stone
+seat in a tree
+one tree
+one stone
+one nest
+one seat
+one tea
+one sea
+to see
+to eat
+to sit
+to see it
+to eat it
+to sit in
+i eat
+i sit
+i eat tea
+i sit in a seat
+i sit on a stone
+see it
+eat tea
+is tea on it
+is one a tree
+are one in
+no one
+not tea
+not sea
+not nest
+see tea
+see sea
+eat in a seat
+sit to eat
+see one tree
+is one on a stone
+are i to sit
+It is in a sea.
+Is a tree on it?
+I see a nest in.
+Eat a stone in.
+In a seat, no.
+It is on a tree.
+Sit in a sea.
+No, it is not in.
+See a stone on it.
+A nest is on it.
+Eat in a seat.
+I sit on a stone.
+No tea in it.
+In a seat, I sit.
+It is not in.
+See a nest on it.
+It is on a seat.
+Eat a tea in.
+I see a tree.
+No, I sit in.
+A tea is on it.
+Sit on a stone.
+In a tree, it is.
+No seat in it.
+See a stone in.
+I sit in a nest.
+Eat a seat in.
+I see a seat.
+Is a nest on it?
+In a sea, I sit.
+Eat a stone.
+Sit on a tree.
+See a sea in it.
+In a stone, it is.
+I see a nest.
+It is not on a tree.
+A seat is in it.
+Is a stone on it?
+I sit in a sea.
+On a tree, I sit.
+See a tree on it.
+Eat a nest in.
+It is in a seat.
+In a nest, it is.
+No, I see a stone.
+Sit on a seat.
+I see a sea.
+Is a tree in it?
+It is on a nest.
+No, it is not on.
+In a seat, I see.
+It is in a tree.
+Sit in a nest.
+Eat a tree in.
+No, not on a seat.
+In a sea, I see.
+It is on a stone.
+See a seat on it.
+I sit on a seat.
+Is a sea in it?
+Eat in a nest.
+On a seat, I sit.
+See a nest in.
+Is it on a tree?
+I see a stone.
+Sit on a nest.
+I eat on a seat.
+I sit in a tree.
+I eat in a tree.
+I eat on a stone.
+I sit to eat.
+I sit to eat tea.
+I sit to see a sea.
+I sit to see a tree.
+I sit to see a nest.
+I sit to see a stone.
+I sit to see a seat.
+I see a tree in a sea.
+I see a nest in a tree.
+I see a stone in a sea.
+I see a stone in a nest.
+I see a seat on a tree.
+I see a seat in a sea.
+I see one tree.
+I see one nest.
+I see one stone.
+I see one seat.
+I see one sea.
+I eat in a nest.
+I eat on a tree.
+It is a tree.
+It is a sea.
+It is a nest.
+It is a stone.
+It is a seat.
+It is a tea.
+It is in a nest.
+It is on a sea.
+It is to eat.
+It is to see.
+It is one tree.
+It is one nest.
+It is one stone.
+It is one seat.
+It is one sea.
+It is one are.
+It is not a tree.
+It is not a sea.
+It is not a nest.
+It is not a stone.
+It is not a seat.
+It is not tea.
+It is not in a tree.
+It is not in a nest.
+It is not in a sea.
+It is not on a seat.
+It is not on a stone.
+It is not on a nest.
+It is not one tree.
+It is not one stone.
+It is not to eat.
+Is it a tree?
+Is it a sea?
+Is it a nest?
+Is it a stone?
+Is it a seat?
+Is it tea?
+Is it in a tree?
+Is it in a nest?
+Is it in a sea?
+Is it on a seat?
+Is it on a stone?
+Is it on a nest?
+Is it not a tree?
+Is it not a nest?
+Is it not a stone?
+Is it not a seat?
+Is it one tree?
+Is it one nest?
+Is it one stone?
+Is it one seat?
+Is it one are?
+No, it is not.
+No, it is a tree.
+No, it is a nest.
+No, it is a stone.
+No, it is a seat.
+No, it is tea.
+No, it is in a tree.
+No, it is on a stone.
+No, I sit.
+No, I eat.
+No, I see a tree.
+No, I see a sea.
+i see a tree.
+it is a stone.
+eat a nest.
+tea is in a sea.
+sit on a seat.
+no, it is not a tree.
+is it a nest?
+one stone is on a seat.
+i sit on a stone.
+a sea is not in a tree.
+see a nest in a tree.
+is tea in a sea?
+no, tea is in a nest.
+one tree is on a stone.
+sit on a seat, eat a nest.
+it is not a stone, it is a seat.
+a stone is in a nest.
+is it a sea or a tree?
+it is a tree, not a sea.
+sit on a seat, see a sea.
+a nest is on a tree.
+no, sit on a seat.
+is tea in a stone?
+one seat is in a tree.
+eat a stone? no, eat a nest.
+see a tree on a stone.
+it is a sea, i see it.
+sit on a nest? no, sit on a seat.
+a tree is not a seat.
+is a stone in a sea?
+no, a stone is on a tree.
+one nest is in a tree.
+eat a nest on a seat.
+i sit in a tree.
+it is a sea, not a nest.
+tea is in a tree? no.
+see a stone in a sea.
+sit on a tree? no, sit on a seat.
+one sea is not a tree.
+eat a stone? it is not a nest.
+a nest is in a sea? no.
+i see a seat in a tree.
+is tea on a stone?
+no, tea is in a sea.
+sit on a stone, see a nest.
+it is a tree, i see it.
+a sea is on a stone? no.
+eat tea, not a stone.
+one stone is in a seat.
+sit on a seat in a tree.
+i see tea in a nest.
+is it a seat or a stone?
+it is a seat, not a stone.
+eat a nest in a tree.
+a tree is on a sea? no.
+see a stone on a nest.
+sit on a seat, eat tea.
+one nest is not a stone.
+tea is in a tree, not a sea.
+i sit on a nest? no.
+a stone is not a seat.
+see a tree, sit on a stone.
+is one nest in a sea?
+no, one nest is in a tree.
+it is a stone, i see it.
+see a sea, not a tree.
+a nest is on a stone.
+sit in a sea? no, sit on a seat.
+tea is on a seat.
+is a tree in a sea?
+no, a tree is on a stone.
+eat one tea? no, eat one nest.
+sit on a stone, see a sea.
+I see it.
+Sit on it.
+See a tree.
+I eat a tea.
+Sit in a seat.
+I see a nest in it.
+See it on a tree.
+A nest is in a tree.
+I see a stone in it.
+I see a nest on it.
+A stone is in it.
+Eat a tea on a seat.
+Is a nest in it?
+I sit in a seat.
+See a nest on a tree.
+I see a seat in it.
+A seat is on it.
+I eat it.
+See it in a nest.
+I sit on it.
+A tree is on a stone.
+Is a seat in it?
+I eat a tea in it.
+Sit in it.
+I see a sea in it.
+A nest is on a seat.
+See it on a stone.
+I sit on a nest.
+Eat it on a seat.
+I see it in a sea.
+Sit on a seat in it.
+A stone is on a seat.
+I eat a tea on it.
+See a tree in it.
+A nest is not in it.
+I see a stone on a seat.
+Sit on it in a tree.
+It is a nest on it.
+Eat a tea in a seat.
+I sit on a stone in it.
+See it in a seat.
+A seat is not on it.
+I eat it on a stone.
+See a sea on it.
+Is a nest on a tree?
+I sit on a seat in it.
+A tree is not in it.
+See a nest in a seat.
+I see a tree on a stone.
+Sit on a stone in a sea.
+Is it a tea?
+I eat a tea on a nest.
+See it on a seat.
+A stone is not on it.
+I sit in a nest on it.
+See a stone in a tree.
+I see it on a nest.
+Is a seat on a stone?
+Sit in a sea on it.
+I eat it in a seat.
+A nest is in a seat.
+See a tree on a seat.
+I sit on a tree on it.
+See a stone in a nest.
+I eat a tea in a tree.
+A seat is in a tree.
+It is a seat on it.
+Sit in a nest in it.
+I see a sea on a stone.
+See it in a tree.
+Is a stone in a nest?
+I sit on a nest in a tree.
+Eat a tea on a stone in it.
+I see no nest.
+Are no trees on it?
+Sit on no stone.
+I see no sea in it.
+No seat is in a nest.
+See no stone on a seat.
+I eat no tea.
+No tree is in a sea.
+Sit in no nest on it.
+I see it in no tree.
+No stone is on a nest.
+Eat no tea in it.
+Are no seats on a stone?
+I sit on no seat.
+It is not in a seat.
+See no nest in a tree.
+No sea is on a stone.
+I see no tree on it.
+Is no nest in it?
+Sit on no tree in it.
+I eat no tea on a seat.
+No nest is on a stone.
+It is not a sea on it.
+See no seat in a tree.
+Are no stones in it?
+I sit in no nest.
+No tree is on a seat.
+I see no stone in a sea.
+Is it not on a seat?
+Sit on no nest in a tree.
+I eat no tea in a nest.
+No seat is on a tree.
+It is not a nest in it.
+See no tree in a sea.
+Are no nests on it?
+I sit on no stone in it.
+No stone is in a tree.
+I see no seat on a nest.
+Is it not in a nest?
+Sit in no sea on it.
+I eat no tea on a stone.
+No nest is in a seat.
+See no stone in a nest.
+Are no trees in a sea?
+I sit on no tree on it.
+No seat is in a tree.
+Eat a nest on it.
+Sit in a tree.
+In a seat, it is.
+Eat a seat in it.
+In a nest, I sit.
+Is a seat on it?
+I see a seat on it.
+No, not in a seat.
+In a tree, I see.
+It is in a stone.
+Eat a tree on it.
+No, it is not on a seat.
+See a stone in it.
+I see a tree in it.
+Eat in a tree.
+In a stone, I sit.
+Eat a seat on it.
+In a nest, I see.
+Eat a stone in it.
+In a tree, I sit.
+Sit on a sea.
+I see a stone on it.
+Eat a tree in it.
+See a nest in it.
+Eat a sea in it.
+I see a tree on it.
+Eat a sea on it.
+Eat a nest in it.
+Eat a stone on it.
+I see a sea on it.
+See a seat in it.
+In a stone, I see.

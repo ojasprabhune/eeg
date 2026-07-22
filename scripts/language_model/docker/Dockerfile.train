@@ -1,0 +1,19 @@
+# CUDA image for the CER-vs-accuracy training sweep on an Azure Container Apps
+# A100 (the `thava` env, gpu-a100 profile). Bundles the eeg package + config +
+# corpora so the job is self-contained; results/checkpoints/plots are uploaded
+# to blob at the end. Build context = repo root.
+FROM pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir numpy pyyaml matplotlib azure-storage-blob
+
+COPY eeg/ /app/eeg/
+COPY config/ /app/config/
+COPY scripts/language_model/run_experiments.py /app/run_experiments.py
+
+ENV SWEEP_DEVICE=cuda
+ENV SWEEP_CKPT_DIR=/app/ckpts/lm
+ENV SWEEP_FIG_DIR=/app/figures
+
+CMD ["python", "run_experiments.py"]

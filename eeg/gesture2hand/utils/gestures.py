@@ -1,5 +1,5 @@
 gesture_experiments = {
-    "standard_mapping": {
+    "standard": {
         "a": 1,
         "b": 4,
         "c": 4,
@@ -27,7 +27,17 @@ gesture_experiments = {
         "y": 3,
         "z": 3,
     },
-    "8_letters": {
+    "asl_8_letters": {
+        "e": 1,
+        "t": 1,
+        "h": 2,
+        "f": 2,
+        "i": 3,
+        "r": 3,
+        "o": 4,
+        "c": 4,
+    },
+    "common_8_letters": {
         "e": 1,
         "t": 2,
         "a": 3,
@@ -36,6 +46,14 @@ gesture_experiments = {
         "n": 3,
         "s": 2,
         "r": 1,
+    },
+    "6_letters": {
+        "e": 1,
+        "t": 2,
+        "a": 3,
+        "o": 4,
+        "i": 5,
+        "n": 6,
     },
 }
 

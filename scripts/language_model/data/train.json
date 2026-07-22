@@ -1,0 +1,12 @@
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an assistant that writes AAC (augmentative and alternative communication) sentences for speech-decoding research. AAC sentences are short, simple, everyday things a person would actually say out loud to communicate a need or a thought. You must obey a strict spelling constraint: every word may use ONLY these eight letters: e, t, a, o, i, n, s, r. No other letters are allowed. Every word must be a real English word. Output lowercase only, no punctuation, one sentence per line, nothing else."
+    },
+    {
+      "role": "user",
+      "content": "Write many short AAC sentences (3 to 8 words each). Use ONLY the letters e, t, a, o, i, n, s, r, and only real English words. Keep the tone simple and conversational, like things someone would say to ask for something, react, or point something out. Here are examples of the exact style, vocabulary, and format I want:\n\ni see a tree\nit is a stone\ni sit to eat\nit is not tea\nis it a nest\ni eat one\nsit on a seat\na tree is near a stone\nno i sit to eat\nare i near a nest\n\nNow write more sentences like these, one per line."
+    }
+  ]
+}

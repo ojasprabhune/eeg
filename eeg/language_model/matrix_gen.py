@@ -10,7 +10,7 @@ import numpy as np
 import torch
 from numpy.typing import NDArray
 
-from eeg.gesture2hand import Colors, gesture_classes, get_gesture_class
+from eeg.gesture2hand import Colors, get_gesture_class
 
 alphabet = "abcdefghijklmnopqrstuvwxyz"
 
@@ -83,7 +83,7 @@ def get_viterbi_matrices(
     emission_matrix = np.zeros((26, 4))
 
     for i in range(len(emission_matrix)):
-        gesture_class = get_gesture_class(i)
+        gesture_class = get_gesture_class(i, experiment="standard")
         emission_matrix[i] = confusion_matrix[gesture_class]
 
     return initial_state, transition_matrix, emission_matrix
@@ -168,6 +168,7 @@ def make_natural_observation_matrix(
 
 def make_placeholder_feature_sequences(
     sentences: list[str],
+    experiment: str,
     num_classes: int = 4,
     correct_mean: float = 0.8,
     accuracy: float = 0.8,
@@ -201,7 +202,8 @@ def make_placeholder_feature_sequences(
         T = len(sentence)
 
         gesture_sequence = [
-            get_gesture_class(letter, zero_based_idx=False) for letter in sentence
+            get_gesture_class(letter, experiment=experiment, zero_based_idx=False)
+            for letter in sentence
         ]
 
         if natural_observation_matrix:

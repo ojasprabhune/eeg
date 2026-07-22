@@ -1,0 +1,500 @@
+I eat.
+I eat it.
+I eat one.
+I eat ten.
+I eat an ant.
+I eat in a tent.
+I eat at ten.
+I eat too.
+Eat it.
+Eat one.
+Eat ten.
+Eat a ton.
+Eat in a tent.
+Eat at ten.
+I ate.
+I ate it.
+I ate one.
+I ate ten.
+I ate an ant.
+I ate a ton.
+I ate in a tent.
+I ate at ten.
+I ate too.
+I tie it.
+I tie one.
+I tie ten.
+I tie a net.
+I tie a tent.
+I tie a toe.
+I tie it to a tent.
+I tie it to a net.
+I tie it into a net.
+I tie it on a tent.
+I tie it too.
+Tie it.
+Tie one.
+Tie ten.
+Tie a net.
+Tie a tent.
+Tie a toe.
+Tie it to a tent.
+Tie it to a net.
+Tie it into a tent.
+Tie it on a net.
+I note it.
+I note one.
+I note ten.
+I note a tone.
+I note a net.
+I note a tent.
+I note a ton.
+I note an ant.
+I note it too.
+Note it.
+Note one.
+Note ten.
+Note a tone.
+Note a net.
+Note a tent.
+Tea at ten.
+Tea in a tent.
+Tea at one.
+One tea.
+Ten tea.
+No tea.
+Not tea.
+Tea too.
+One ant.
+An ant in a tent.
+An ant on a net.
+An ant on a toe.
+An ant ate it.
+An ant ate.
+An ant ate a ton.
+No ant.
+Not an ant.
+An ant too.
+One in a tent.
+Ten in a tent.
+One on a net.
+Ten on a net.
+One at ten.
+Ten at one.
+Into a net.
+Into a tent.
+On a tent.
+On a net.
+In a tent.
+In a net.
+At ten.
+At one.
+To a tent.
+To a net.
+Not in a tent.
+Not on a net.
+Not at ten.
+Not to a net.
+Not it.
+No, not it.
+Note it into a net.
+i ate a ton
+an ant ate tea
+one toe on a ten
+not a note on it
+eat at ten
+tie it on one toe
+in an ant net?
+i ate an ant
+a note on a ton
+eat one ant?
+a toe on one ant
+not a ton, a ten
+i note a tone
+tea at ten?
+tie a net on it
+one ant ate a ton
+an ant in a tent
+no tone in it
+one tent, one net
+not a note, a toe
+it ate one ant
+a ten on a toe
+tea in a tent
+tone it to ten
+eat a ten?
+tie one toe to it
+i ate a note
+into a tent at ten
+one note on a tent
+eat it at ten
+tie it into a net
+not on a toe?
+i note a ten
+an ant ate one toe
+one tent, one ton
+into a note?
+no, ate one ant
+a net on a toe
+tie a toe to a ten
+one ant in a net
+eat one ton?
+into a toe?
+not a tent, a net
+tone it into a ten
+a tea note?
+tie a tent to a ton
+one ant on a net
+eat a net?
+i note an ant
+tie one net to a tent
+into a ton?
+not a toe, a ten
+one tone in a note
+i ate it in a tent
+I eat a tent in a note.
+In a tone, I ate it.
+A note on a ton.
+I tie a note into it.
+I note a tone in it.
+In a ton, I ate tea.
+I ate into a tone.
+I eat a note into it.
+I note a tent in a tone.
+In a tent, I tie it.
+I eat into a ton.
+I eat a ton in a note.
+I note a tone into it.
+I eat into a tone.
+In a net, I tie it.
+I note a ton into it.
+I eat a note in a tone.
+In a tone, I tie it.
+I eat into a note.
+I note a tone in a tent.
+I note a tent into a tone.
+In a note, I tie it.
+I eat into a tent.
+I note a tone in a note.
+I eat a note into a tent.
+In a tone, I eat it.
+I note a net into it.
+I eat a ton.
+I eat tea.
+I ate tea.
+I ate on a net.
+I eat at a tent.
+I ate it in a tent.
+I eat it in a tent.
+I ate it on a net.
+I ate no tea.
+I eat no tea.
+I ate not a ton.
+I ate it too.
+I eat it too.
+I ate a ton too.
+Tie a tie.
+I tie a tie.
+Tie a net to a tent.
+I tie a net to a tent.
+I tie a net on it.
+Tie a net on it.
+I tie no tie.
+I tie it in a net.
+Tie it in a net.
+Tie it into a net.
+I note a note.
+Note a note.
+I note no tone.
+I note it in a tent.
+Note it in a tent.
+I note it on a net.
+I note not a tone.
+I note a toe.
+Note a toe.
+I tone it.
+Tone it.
+I tone a tone.
+Tone a tone.
+I tone it in a tent.
+Tone it in a tent.
+I tone no tone.
+I tone it on a net.
+I tone a toe.
+I net it.
+Net it.
+I net an ant.
+Net an ant.
+I net a ton.
+Net a ton.
+I net it in a net.
+Net it in a net.
+I net an ant in a net.
+Net an ant in a net.
+I net no ant.
+I net it on a tent.
+I net one toe.
+I ate it?
+I eat a ton?
+I ate in a tent?
+I tie it?
+Tie it to a tent?
+I note a tone?
+Note it?
+I tone it?
+I net an ant?
+Net it in a net?
+I ate no tea?
+No tea?
+An ant?
+A ton?
+A tent?
+I ate ten?
+I eat tea?
+Not a tent.
+No ant in it.
+I tone it too.
+I net it too.
+Eat it too.
+Tie it too.
+Note it too.
+Tone it too.
+Net it too.
+I ate a toe.
+One ant ate a ton.
+No one ate it.
+Tie a net to it.
+An ant ate no tea.
+No ant ate it.
+No, not I.
+Tie a toe in a net.
+It ate an ant.
+I ate it at ten.
+Tie it in a tent.
+No tea, no tie.
+I ate a ton in it.
+An ant ate a toe.
+No, not one.
+I ate no ant.
+Tie a tent to it.
+One ant in a net.
+No tea at ten.
+I ate it on a tent.
+Tie it at one.
+No, I ate it.
+One toe in a net.
+I ate tea at ten.
+Tie a note to it.
+An ant ate one.
+No tie on it.
+I ate it into a net.
+One ant on a toe.
+Tie it in tone.
+No ant in a tent.
+One note in a net.
+Tie a toe to it.
+An ant ate tea.
+I ate it at one.
+No tea in a tent.
+One ton at ten.
+Tie a net in a tent.
+I ate no ton.
+I tie it in tone.
+An ant ate into it.
+Tie it on a tent.
+I ate one ton.
+Tie a note in it.
+One toe ate an ant.
+I eat tea not ant.
+I ate a note.
+I ate it not.
+I note it on a tea.
+I ate into it.
+I ate into tea.
+I eat to it.
+I ate it in net.
+I note it in it.
+I ate not it.
+I tone it in tea.
+I note into it.
+I ate tea not it.
+Eat one ton.
+Ate one ton.
+Eat tea.
+Ate tea.
+Not one.
+Too one.
+One ant ate it.
+Ant in tent.
+Ant on toe.
+Ant in net.
+Tie one net.
+Tie it in tent.
+Tie one toe.
+Tie toe in net.
+Note one tone.
+Note it in net.
+One tone in tent.
+Tone in net.
+Into one tent.
+Into one net.
+Tea in tent.
+Tea in net.
+Tea to one.
+One tea to eat.
+Eat in tent.
+Ate in tent.
+Eat at one.
+Ate at ten.
+In one tent.
+On one net.
+At one ton.
+To one tent.
+Not too ten.
+No not one.
+I eat one too.
+I ate one too.
+Eat it in one.
+Ate it in one.
+Tie it to one.
+Note one ant.
+One ant in tent.
+Ten to eat.
+Ten to one.
+One to ten.
+I tie one ton.
+Tie one ton.
+One ant ate one.
+Eat an ant.
+Ate an ant.
+Ant on one toe.
+Toe in one tent.
+Net in one ton.
+Ton in one tent.
+Note to one.
+Tone to eat.
+One tone to note.
+I note one ant.
+I eat in one net.
+I ate in one net.
+Eat tea at one.
+Ate tea at ten.
+No tie.
+Not tie one.
+Too not one.
+I eat to one.
+I ate to ten.
+One net to tie.
+One tent to eat in.
+Eat one in tent.
+Ate one in tent.
+Tie one to net.
+I tie it on one.
+I note it at one.
+Note it at ten.
+One ton to tie.
+One ton to eat.
+Eat one ton in tent.
+I eat one ant.
+I ate tea in tent.
+To eat a tea.
+On a toe.
+At no tone.
+Not a tie.
+A note to tie.
+To net a tone.
+In a toe.
+At a tea.
+Not a net.
+Too ate.
+A ton to net.
+To toe a tent.
+In a tea.
+On a note.
+At a tone.
+Not a toe.
+Too one to eat.
+Ten ate a net.
+I tie a note.
+A tea to net.
+To tone a toe.
+In a tie.
+On a ton.
+At a net.
+Not a tea.
+Too ate a note.
+Ten to tie.
+I net a tone.
+A tent to eat.
+To note a tie.
+In a ton.
+On a tea.
+At a toe.
+Too one to tie.
+Ten ate a tone.
+A note to eat.
+To tent a tone.
+In a tea to net.
+On a toe to tie.
+At a note to eat.
+Not a ton.
+Too ate a tent.
+Ten to net.
+A ton to note.
+To toe a net.
+In a tent to tie.
+On a tone to eat.
+At a tie to net.
+Not a note.
+Too one to net.
+Ten ate a toe.
+I net a tea.
+A tie to tone.
+To note a toe.
+In a ton to net.
+On a net to tie.
+At a tea to eat.
+Not a toe to net.
+Too ate a note to tie.
+Ten to eat a tone.
+I ate a net.
+A tent to note.
+To tea a tone.
+In a tie to net.
+On a ton to eat.
+At a note to tie.
+Not a net to eat.
+Too one to toe.
+Ten ate a tent.
+I tie a ton.
+A tea to tone.
+To tent a toe.
+In a net to eat.
+On a tie to note.
+At a toe to net.
+Not a tone to eat.
+Too ate a tea to tie.
+Ten to net a tone.
+I eat tone.
+I eat note.
+I eat net.
+I eat tent.
+I eat toe.
+I eat ant.
+I eat ton.
+I eat into tea.
+I eat on ten.
+I eat in net.
+I eat at one.
+I eat not it.
+I ate tone.
+I ate note.
+I ate net.
+I ate tent.
+I ate toe.
+I ate ant.
+I ate ton.
+I ate on ten.
+I ate in net.
+I ate at one.
+I ate to it.

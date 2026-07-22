@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "accelerate>=1.14.0",
     "braindecode[hub]>=1.3.1",
     "cryptography>=46.0.3",
     "dora-rs==0.3.13",
@@ -26,6 +27,7 @@ dependencies = [
     "scikit-learn==1.7.2",
     "seaborn>=0.13.2",
     "tqdm>=4.67.1",
+    "transformers>=5.14.1",
     "ucimlrepo>=0.0.7",
     "wandb>=0.22.3",
 ]

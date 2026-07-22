@@ -12,6 +12,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 import wandb
+from eeg.gesture2hand.datasets.utils import Colors
 from eeg.language_model import LanguageDataset, LanguageModel
 
 # --- configuration -----------------------------------------------------------
@@ -41,6 +42,7 @@ with open("config/language_model.yaml", "r") as config_file:
     warmup_steps = config["warmup_steps"]
     base_lr = float(config["base_lr"])
     epochs = config["epochs"]
+    experiment_name = config["experiment_name"]
 
     min_value = config["min_value"]
     k = config["k"]
@@ -50,138 +52,165 @@ with open("config/language_model.yaml", "r") as config_file:
     save_ckpt_path = config["save_ckpt_path"]
     save_every = config["save_every"]
 
-# --- data --------------------------------------------------------------------
-
-train_language_dataset = LanguageDataset(
-    num_classes=num_classes,
-    mode="train",
-    print_shapes=False,
-)
-
-val_language_dataset = LanguageDataset(
-    num_classes=num_classes,
-    mode="val",
-    print_shapes=False,
-)
-
-train_language_dataloader = DataLoader(
-    train_language_dataset,
-    batch_size=32,
-    shuffle=True,
-)
-val_language_dataloader = DataLoader(
-    val_language_dataset,
-    batch_size=32,
-    shuffle=False,
-)
-
-# --- model -------------------------------------------------------------------
-
-model = LanguageModel(
-    vocab_size=vocab_size,
-    num_layers=num_layers,
-    decoder_num_layers=decoder_num_layers,
-    num_heads=num_heads,
-    num_inputs_classes=num_classes,
-    decoder_embedding_dim=decoder_embedding_dim,
-    ffn_hidden_dim=ffn_hidden_dim,
-    encoder_dropout=encoder_dropout,
-    decoder_dropout=decoder_dropout,
-    k=k,
-    min_value=min_value,
-).to(device)
-
-# --- training ----------------------------------------------------------------
-
-optimizer = AdamW(model.parameters(), lr=base_lr, betas=(0.9, 0.98), eps=1e-9)
-ce_loss_fn = CrossEntropyLoss(ignore_index=0)  # ignore <PAD> token id
-mse_loss_fn = MSELoss()
-
-param_count = sum(p.numel() for p in model.parameters() if p.requires_grad)
-print(f"\nNumber of model parameters: {param_count:,}\n")
-
-# --- checkpoint --------------------------------------------------------------
-
-if use_ckpt_path is not None:
-    state_dict = torch.load(use_ckpt_path, map_location=device)
-    model.load_state_dict(state_dict["model"])
-    optimizer.load_state_dict(state_dict["optimizer"])
-    start = state_dict["epochs"]
-    print(f"Loaded checkpoint from {use_ckpt_path}")
-else:
-    start = 0
-
-# --- validation --------------------------------------------------------------
+    if (
+        experiment_name == "standard"
+        or experiment_name == "asl_8_letters"
+        or experiment_name == "common_8_letters"
+    ):
+        num_classes = 4
+    elif experiment_name == "6_letters":
+        num_classes = 6
 
 
-def validate() -> tuple[float, float]:
-    """
-    Run one pass over the validation set, return (loss, accuracy).
-    """
-    model.eval()
-    total_loss = 0.0
-    correct = 0
-    total = 0
-    all_preds = []
-    all_labels = []
+def train(experiment_name: str):
 
-    step = 0
+    # --- data --------------------------------------------------------------------
 
-    with torch.no_grad():
-        for feature, feature_mask, label, label_mask, _ in val_language_dataloader:
-            feature = feature.to(device)
-            feature_mask = feature_mask.to(device).bool()
-            label = label.to(device).to(torch.int64)
-            label_mask = label_mask.to(device).bool()
+    if (
+        experiment_name == "standard"
+        or experiment_name == "asl_8_letters"
+        or experiment_name == "common_8_letters"
+    ):
+        num_classes = 4
+    elif experiment_name == "6_letters":
+        num_classes = 6
+    else:
+        num_classes = 4
 
-            valid = label_mask[:, 1:]  # align with gt_label
+    run_name = f"lm_{experiment_name}"
 
-            in_feature = feature[:, :-1, :]
-            in_feature_mask = feature_mask[:, :-1]
-            in_label = label[:, :-1]
-            in_label_mask = label_mask[:, :-1]
+    print(f"{Colors.HEADER}{Colors.BOLD}=======================================")
+    print(f"STARTING TRAINING FOR RUN: {run_name} FOR {epochs} EPOCHS")
+    print(f"======================================={Colors.ENDC}")
 
-            gt_feature = feature[:, 1:, :]
-            gt_label = label[:, 1:]
+    train_language_dataset = LanguageDataset(
+        experiment=experiment_name,
+        num_classes=num_classes,
+        mode="train",
+        print_shapes=False,
+    )
 
-            label_logits, recon = model(
-                src=in_feature,
-                tgt=in_label,
-                src_pad_mask=~in_feature_mask,  # flip because 1 should mean padding
-                tgt_pad_mask=~in_label_mask,
-                step=step,
-                return_epsilon=False,
-                use_scheduled_sampling=False,  # clean teacher-forced eval, no mixing
-            )  # out: (B, seq_len, vocab_size)
+    val_language_dataset = LanguageDataset(
+        experiment=experiment_name,
+        num_classes=num_classes,
+        mode="val",
+        print_shapes=False,
+    )
 
-            label_logits = label_logits.transpose(1, 2)  # (B, vocab_size, seq_len)
+    train_language_dataloader = DataLoader(
+        train_language_dataset,
+        batch_size=32,
+        shuffle=True,
+    )
+    val_language_dataloader = DataLoader(
+        val_language_dataset,
+        batch_size=32,
+        shuffle=False,
+    )
 
-            loss_letters = ce_loss_fn(label_logits, gt_label)
-            loss_recon = mse_loss_fn(recon, gt_feature)
+    # --- model -------------------------------------------------------------------
 
-            loss = loss_letters + recon_lambda * loss_recon
+    model = LanguageModel(
+        vocab_size=vocab_size,
+        num_layers=num_layers,
+        decoder_num_layers=decoder_num_layers,
+        num_heads=num_heads,
+        num_inputs_classes=num_classes,
+        decoder_embedding_dim=decoder_embedding_dim,
+        ffn_hidden_dim=ffn_hidden_dim,
+        encoder_dropout=encoder_dropout,
+        decoder_dropout=decoder_dropout,
+        k=k,
+        min_value=min_value,
+    ).to(device)
 
-            total_loss += loss.item() * batch_size
-            preds = label_logits.argmax(dim=1)
+    # --- training ----------------------------------------------------------------
 
-            correct += ((preds == gt_label) & valid).sum().item()
-            total += valid.sum().item()
+    optimizer = AdamW(model.parameters(), lr=base_lr, betas=(0.9, 0.98), eps=1e-9)
+    ce_loss_fn = CrossEntropyLoss(ignore_index=0)  # ignore <PAD> token id
+    mse_loss_fn = MSELoss()
 
-            all_preds.append(preds.cpu())
-            all_labels.append(gt_label.cpu())
+    param_count = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"Number of model parameters: {param_count:,}")
 
-            step += 1
+    # --- checkpoint --------------------------------------------------------------
 
-    model.train()
-    avg_loss = total_loss / max(total, 1)
-    accuracy = correct / max(total, 1)
-    return avg_loss, accuracy
+    if use_ckpt_path is not None:
+        state_dict = torch.load(use_ckpt_path, map_location=device)
+        model.load_state_dict(state_dict["model"])
+        optimizer.load_state_dict(state_dict["optimizer"])
+        start = state_dict["epochs"]
+        print(f"Loaded checkpoint from {use_ckpt_path}")
+    else:
+        start = 0
 
+    # --- validation --------------------------------------------------------------
 
-# --- training ----------------------------------------------------------------
+    def validate() -> tuple[float, float]:
+        """
+        Run one pass over the validation set, return (loss, accuracy).
+        """
+        model.eval()
+        total_loss = 0.0
+        correct = 0
+        total = 0
+        all_preds = []
+        all_labels = []
 
+        step = 0
 
-def train():
+        with torch.no_grad():
+            for feature, feature_mask, label, label_mask, _ in val_language_dataloader:
+                feature = feature.to(device)
+                feature_mask = feature_mask.to(device).bool()
+                label = label.to(device).to(torch.int64)
+                label_mask = label_mask.to(device).bool()
+
+                valid = label_mask[:, 1:]  # align with gt_label
+
+                in_feature = feature[:, :-1, :]
+                in_feature_mask = feature_mask[:, :-1]
+                in_label = label[:, :-1]
+                in_label_mask = label_mask[:, :-1]
+
+                gt_feature = feature[:, 1:, :]
+                gt_label = label[:, 1:]
+
+                label_logits, recon = model(
+                    src=in_feature,
+                    tgt=in_label,
+                    src_pad_mask=~in_feature_mask,  # flip because 1 should mean padding
+                    tgt_pad_mask=~in_label_mask,
+                    step=step,
+                    return_epsilon=False,
+                    use_scheduled_sampling=False,  # clean teacher-forced eval, no mixing
+                )  # out: (B, seq_len, vocab_size)
+
+                label_logits = label_logits.transpose(1, 2)  # (B, vocab_size, seq_len)
+
+                loss_letters = ce_loss_fn(label_logits, gt_label)
+                loss_recon = mse_loss_fn(recon, gt_feature)
+
+                loss = loss_letters + recon_lambda * loss_recon
+
+                total_loss += loss.item() * batch_size
+                preds = label_logits.argmax(dim=1)
+
+                correct += ((preds == gt_label) & valid).sum().item()
+                total += valid.sum().item()
+
+                all_preds.append(preds.cpu())
+                all_labels.append(gt_label.cpu())
+
+                step += 1
+
+        model.train()
+        avg_loss = total_loss / max(total, 1)
+        accuracy = correct / max(total, 1)
+        return avg_loss, accuracy
+
+    # --- training ----------------------------------------------------------------
+
     run = wandb.init(
         name=run_name,
         entity="prabhuneojas-evergreen-valley-high-school",
@@ -198,6 +227,8 @@ def train():
     model.train()
 
     step = 0
+
+    val_acc = 0
 
     epoch_tqdm = tqdm(range(start, epochs), dynamic_ncols=True)
     for i in epoch_tqdm:
@@ -285,5 +316,14 @@ def train():
     if save_ckpt_path is not None:
         torch.save(latest_ckpt, save_ckpt_path)
 
+    print(f"{Colors.OKGREEN}=======================================")
+    print(f"TRAINING COMPLETE FOR RUN: {run_name} FOR {epochs} EPOCHS")
+    print(
+        f"Latest checkpoint saved at {save_ckpt_path} with {val_acc:.3f} validation accuracy "
+    )
+    print(f"======================================={Colors.ENDC}")
 
-train()
+
+train(experiment_name="asl_8_letters")
+train(experiment_name="common_8_letters")
+train(experiment_name="6_letters")
