@@ -84,11 +84,15 @@ class LanguageDataset(Dataset):
 
         if mode == "train":
             print(
-                f"{Colors.HEADER}{Colors.BOLD}=== Initializing training dataset... ==={Colors.ENDC}"
+                f"{Colors.HEADER}{Colors.BOLD}=== Initializing training dataset... ==={
+                    Colors.ENDC
+                }"
             )
         else:
             print(
-                f"{Colors.HEADER}{Colors.BOLD}=== Initializing validation dataset... ==={Colors.ENDC}"
+                f"{Colors.HEADER}{
+                    Colors.BOLD
+                }=== Initializing validation dataset... ==={Colors.ENDC}"
             )
         self.print_shapes = print_shapes
         self.device = device

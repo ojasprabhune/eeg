@@ -9,4 +9,5 @@ export PYTHONPATH="$PWD"
 export SWEEP_DEVICE=mps
 export SWEEP_K=1200
 export SWEEP_EPOCHS=450
-exec .venv/bin/python -u scripts/language_model/run_experiments.py "$@"
+export SWEEP_CKPT_DIR=/Users/ojasprabhune/Documents/research/NORA/ckpts/lm
+exec .venv/bin/python -u scripts/language_model/experiments/run_experiments.py "$@"

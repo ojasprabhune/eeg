@@ -121,7 +121,7 @@ def evaluate_cer(model, dataset, tokenizer, device) -> float:
     for r in range(preds.size(0)):
         eos_pos = (preds[r] == EOS).nonzero()
         if len(eos_pos) > 0:
-            preds[r, eos_pos[0].item():] = PAD
+            preds[r, eos_pos[0].item() :] = PAD
 
     pred_strs = tokenizer.decode(preds.cpu())
     true_strs = tokenizer.decode(labels.cpu())
@@ -316,7 +316,11 @@ def upload_artifacts():
 
     paths = []
     if os.path.isdir(CKPT_DIR):
-        paths += [os.path.join(CKPT_DIR, f) for f in os.listdir(CKPT_DIR) if f.endswith(".pth")]
+        paths += [
+            os.path.join(CKPT_DIR, f)
+            for f in os.listdir(CKPT_DIR)
+            if f.endswith(".pth")
+        ]
     for f in ("results.json", "cer_vs_accuracy.png", "cer_vs_experiment.png"):
         p = os.path.join(FIG_DIR, f)
         if os.path.exists(p):
@@ -325,7 +329,9 @@ def upload_artifacts():
     for path in paths:
         blob_name = f"lm_run/{os.path.basename(path)}"
         with open(path, "rb") as data:
-            client.get_blob_client(container, blob_name).upload_blob(data, overwrite=True)
+            client.get_blob_client(container, blob_name).upload_blob(
+                data, overwrite=True
+            )
         print(f"uploaded {blob_name}", flush=True)
 
 
