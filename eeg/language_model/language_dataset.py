@@ -3,6 +3,7 @@ import re
 
 import numpy as np
 import torch
+from numpy.typing import NDArray
 from torch.utils.data import Dataset
 
 from eeg.gesture2hand import Colors
@@ -88,12 +89,19 @@ class LanguageDataset(Dataset):
                     Colors.ENDC
                 }"
             )
-        else:
+        elif mode == "validation":
             print(
                 f"{Colors.HEADER}{
                     Colors.BOLD
                 }=== Initializing validation dataset... ==={Colors.ENDC}"
             )
+        else:
+            print(
+                f"{Colors.HEADER}{Colors.BOLD}=== Initializing test dataset... ==={
+                    Colors.ENDC
+                }"
+            )
+
         self.print_shapes = print_shapes
         self.device = device
         self.mode = mode
@@ -159,25 +167,47 @@ class LanguageDataset(Dataset):
         # --- train-val split ---
 
         # index at 80% on time dim
-        self.split_idx = int(len(features) * 0.8)
+        self.train_split_idx = int(len(features) * 0.8)
+        self.val_split_idx = int(len(features) * 0.9)
 
         self.features = np.array(features, dtype=np.float32)
         self.feature_masks = np.array(feature_masks, dtype=np.int32)
         self.labels = np.array(labels, dtype=np.int32)
         self.label_masks = np.array(label_masks, dtype=np.int32)
         self.word_lengths = np.array(word_lengths, dtype=np.int32)
+        self.sentences = np.array(sentences)
 
-        self.train_features = self.features[: self.split_idx, :, :]
-        self.train_feature_masks = self.feature_masks[: self.split_idx, :]
-        self.train_labels = self.labels[: self.split_idx, :]
-        self.train_label_masks = self.label_masks[: self.split_idx, :]
-        self.train_word_lengths = self.word_lengths[: self.split_idx, :]
+        # train: 0-80%
+        self.train_features = self.features[: self.train_split_idx, :, :]
+        self.train_feature_masks = self.feature_masks[: self.train_split_idx, :]
+        self.train_labels = self.labels[: self.train_split_idx, :]
+        self.train_label_masks = self.label_masks[: self.train_split_idx, :]
+        self.train_word_lengths = self.word_lengths[: self.train_split_idx, :]
+        self.train_sentences = self.sentences[: self.train_split_idx]
 
-        self.val_features = self.features[self.split_idx :, :, :]
-        self.val_feature_masks = self.feature_masks[self.split_idx :, :]
-        self.val_labels = self.labels[self.split_idx :, :]
-        self.val_label_masks = self.label_masks[self.split_idx :, :]
-        self.val_word_lengths = self.word_lengths[self.split_idx :, :]
+        # validation: 80-90%
+        self.val_features = self.features[
+            self.train_split_idx : self.val_split_idx, :, :
+        ]
+        self.val_feature_masks = self.feature_masks[
+            self.train_split_idx : self.val_split_idx, :
+        ]
+        self.val_labels = self.labels[self.train_split_idx : self.val_split_idx, :]
+        self.val_label_masks = self.label_masks[
+            self.train_split_idx : self.val_split_idx, :
+        ]
+        self.val_word_lengths = self.word_lengths[
+            self.train_split_idx : self.val_split_idx, :
+        ]
+        self.val_sentences = self.sentences[self.train_split_idx : self.val_split_idx]
+
+        # test: 90-100%
+        self.test_features = self.features[self.val_split_idx :, :, :]
+        self.test_feature_masks = self.feature_masks[self.val_split_idx :, :]
+        self.test_labels = self.labels[self.val_split_idx :, :]
+        self.test_label_masks = self.label_masks[self.val_split_idx :, :]
+        self.test_word_lengths = self.word_lengths[self.val_split_idx :, :]
+        self.test_sentences = self.sentences[self.val_split_idx :]
 
         if print_shapes:
             print(
@@ -185,9 +215,12 @@ class LanguageDataset(Dataset):
             )
 
     def __len__(self) -> int:
-        return (
-            len(self.train_features) if self.mode == "train" else len(self.val_features)
-        )
+        if self.mode == "train":
+            return len(self.train_features)
+        elif self.mode == "validation":
+            return len(self.val_features)
+        else:
+            return len(self.test_features)
 
     def __getitem__(
         self, index: int
@@ -203,12 +236,18 @@ class LanguageDataset(Dataset):
             labels = self.train_labels[index]
             label_mask = self.train_label_masks[index]
             word_lengths = self.train_word_lengths[index]
-        else:
+        elif self.mode == "validation":
             features = self.val_features[index]
             feature_mask = self.val_feature_masks[index]
             labels = self.val_labels[index]
             label_mask = self.val_label_masks[index]
             word_lengths = self.val_word_lengths[index]
+        else:
+            features = self.test_features[index]
+            feature_mask = self.test_feature_masks[index]
+            labels = self.test_labels[index]
+            label_mask = self.test_label_masks[index]
+            word_lengths = self.test_word_lengths[index]
         return (
             torch.tensor(features),
             torch.tensor(feature_mask),
@@ -216,3 +255,6 @@ class LanguageDataset(Dataset):
             torch.tensor(label_mask),
             torch.tensor(word_lengths),
         )
+
+    def sample_train_sentences(self, num_sentences: int) -> NDArray:
+        return self.train_sentences[:num_sentences]

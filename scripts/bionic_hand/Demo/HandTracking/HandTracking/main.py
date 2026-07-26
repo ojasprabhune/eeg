@@ -1,8 +1,8 @@
 import cv2
+import mediapipe as mp
 import numpy as np
 import pyarrow as pa
 from dora import Node
-import mediapipe as mp
 
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
@@ -181,12 +181,26 @@ def process_img(hand_proc, image):
 
 
 def main():
-
+    print("TRACKER: main() started", flush=True)
     node = Node()
+    pa.array([])
 
-    pa.array([])  # initialize pyarrow array
+    # Try default camera index 0, fallback to 1 if external camera
+    print("TRACKER: opening camera...", flush=True)
     cap = cv2.VideoCapture(0)
+    if not cap.isOpened():
+        cap = cv2.VideoCapture(1)
 
+    if not cap.isOpened():
+        print("ERROR: Could not open webcam!", flush=True)
+        return
+    print(f"TRACKER: camera isOpened={cap.isOpened()}", flush=True)
+
+    # Create named window explicitly for macOS compatibility
+    cv2.namedWindow("MediaPipe Hands", cv2.WINDOW_AUTOSIZE)
+    print("TRACKER: window created, entering event loop", flush=True)
+
+    tick_count = 0
     with mp_hands.Hands(
         model_complexity=0, min_detection_confidence=0.5, min_tracking_confidence=0.5
     ) as hands:
@@ -197,26 +211,32 @@ def main():
                 event_id = event["id"]
 
                 if event_id == "tick":
+                    tick_count += 1
+                    if tick_count == 1 or tick_count % 30 == 0:
+                        print(f"TRACKER: tick {tick_count}", flush=True)
                     ret, frame = cap.read()
 
                     if not ret:
+                        print("WARNING: Empty camera frame", flush=True)
                         continue
 
                     frame = cv2.flip(frame, 1)
-                    # process
                     frame, r_res, l_res = process_img(hands, frame)
 
                     if r_res is not None:
                         node.send_output("r_hand_pos", pa.array(r_res))
                     if l_res is not None:
                         node.send_output("l_hand_pos", pa.array(l_res))
-                    # cv2.imshow('MediaPipe Hands', cv2.flip(frame, 1))
+
                     cv2.imshow("MediaPipe Hands", frame)
-                    if cv2.waitKey(1) & 0xFF == ord("q"):
-                        break
+                    # Needs 1ms delay for macOS window rendering loop
+                    cv2.waitKey(1)
 
             elif event_type == "ERROR":
                 raise RuntimeError(event["error"])
+
+    cap.release()
+    cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":

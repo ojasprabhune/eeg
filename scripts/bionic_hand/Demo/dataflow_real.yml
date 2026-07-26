@@ -8,7 +8,6 @@ nodes:
     outputs:
       - r_hand_pos
 
-
   - id: hand_simulation
     build: pip install -e AHSimulation
     path: AHSimulation/AHSimulation/mj_mink_right.py
@@ -22,6 +21,6 @@ nodes:
   - id: hand_controller
     build: cargo build -p AHControl
     path: target/debug/AHControl
-    args: --serialport /dev/ttyAMC0 --config AHControl/config/r_hand.toml
+    args: --serialport /dev/tty.usbmodem5A7C1217101 --config AHControl/config/r_hand.toml
     inputs:
       mj_r_joints_pos: hand_simulation/mj_r_joints_pos

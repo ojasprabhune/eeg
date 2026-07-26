@@ -3,7 +3,7 @@ nodes:
     build: pip install -e HandTracking
     path: HandTracking/HandTracking/main.py
     inputs:
-      tick: dora/timer/millis/5
+      tick: dora/timer/millis/33
     outputs:
       - r_hand_pos
 
@@ -20,6 +20,6 @@ nodes:
   - id: hand_controller
     build: cargo build -p AHControl
     path: target/debug/AHControl
-    args: --serialport /dev/ttyAMC0 --config AHControl/config/r_hand.toml
+    args: --serialport /dev/tty.usbmodem5A7C1217101 --config AHControl/config/r_hand.toml
     inputs:
       mj_r_joints_pos: hand_simulation/mj_r_joints_pos
