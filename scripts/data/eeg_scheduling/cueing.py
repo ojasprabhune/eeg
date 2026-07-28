@@ -24,9 +24,10 @@ def num_classes_for(experiment: str) -> int:
 # CONFIGURATION
 # ==========================
 
-EXPERIMENT = "asl_8_letters"
-GESTURE_TYPE = "discriminative"
-NUM_SENTENCES = 50
+EXPERIMENT = "6_letters"
+GESTURE_TYPE = "hand"
+NUM_SENTENCES = 40
+START_TRIALS = 1
 
 GESTURE_LETTERS = [
     "A",
@@ -116,7 +117,7 @@ else:
         }
 
 sentences = langage_dataset.sample_train_sentences(num_sentences=NUM_SENTENCES)
-sentences = [
+gesture_sentences = [
     [
         get_gesture_class(letter, experiment=EXPERIMENT, zero_based_idx=False)
         for letter in sentence
@@ -125,7 +126,7 @@ sentences = [
 ]
 
 
-total_trials = sum(1 for sentence in sentences for letter in sentence)
+total_trials = sum(1 for sentence in gesture_sentences for letter in sentence)
 
 print(f"\nTotal trials: {total_trials}")
 input("Press ENTER to begin...\n")
@@ -134,9 +135,16 @@ input("Press ENTER to begin...\n")
 # CUEING LOOP
 # ==========================
 
-for sentence in sentences:
-    for i, letter in enumerate(sentence, start=1):
-        print(f"\n-------- Trial {i}/{total_trials} --------")
+trial_count = 1
+
+for i, sentence in enumerate(gesture_sentences):
+    print(f"\n{Colors.OKBLUE}Sentence: {sentences[i]}{Colors.ENDC}")
+
+    for j, letter in enumerate(sentence):
+        if trial_count < START_TRIALS:
+            continue
+
+        print(f"\n-------- Trial {trial_count}/{total_trials} --------")
 
         # rest
         print(f"{Colors.OKGREEN}> REST{Colors.ENDC}")
@@ -144,6 +152,9 @@ for sentence in sentences:
         time.sleep(REST_TIME)
 
         # cue
+        print(
+            f"> TARGET LETTER: {Colors.BOLD}{Colors.OKCYAN}{sentences[i][j]}{Colors.ENDC}"
+        )
         print(
             f"> TARGET GESTURE: {Colors.BOLD}{Colors.OKCYAN}{number_gesture_map[letter]}{Colors.ENDC}"
         )
@@ -160,8 +171,11 @@ for sentence in sentences:
         outlet.push_sample([f"MOVE_{letter}"])
         time.sleep(MOTOR_EXEC)
 
+        trial_count += 1
+
     print(f"\n{Colors.OKBLUE}Sentence finished.{Colors.ENDC}")
     outlet.push_sample(["END_SEQ"])
 
-print("\nExperiment complete.")
+print(f"\nExperiment {EXPERIMENT} complete.")
+input("Press ENTER to finish...")
 outlet.push_sample(["SESSION_END"])

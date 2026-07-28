@@ -118,6 +118,6 @@ def summarize_all(
 
 summarize_all(
     ["asl_8_letters", "common_8_letters", "6_letters"],
-    sample_sentences=50,
+    sample_sentences=40,
     trial_length=8,
 )

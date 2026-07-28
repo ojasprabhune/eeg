@@ -1,17 +1,35 @@
+# os files
 **/.DS_Store
-**/__pycache__
-**/eeg.egg-info
-.venv/
-./.venv/
-win_venv/
-.git/
-**wandb/
-.env
-**target/
-out/
+
+# python cache/build files
+**/__pycache__/
 *.egg-info/
-data/dataset/
-**wandb/*
+eeg.egg-info/
+
+# virtual environments
+.venv/
+win_venv/
+
+# git
+.git/
+
+# environment files
+.env
 .envrc
 
+# ml experiment tracking
+wandb/
+**/wandb/
+
+# build/output files
+target/
+out/
+
+# data
+data/dataset/
+
+# project-specific
 scripts/bionic_hand/Demo/
+
+# ai assistant config
+CLAUDE.md
