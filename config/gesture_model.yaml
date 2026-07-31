@@ -1,0 +1,27 @@
+# gesture model (EEG epoch -> gesture class, encoder + decoder query)
+
+experiment: 6_letters
+input_type: bandpower # "bandpower" (84 features) or "raw" (14 channels)
+val_ratio: 0.2
+
+num_layers: 2
+decoder_num_layers: 2
+num_heads: 2
+embedding_dim: 8
+ffn_hidden_dim: 8
+encoder_dropout: 0.1
+decoder_dropout: 0.1
+
+# training
+
+device: cpu
+batch_size: 8
+warmup_steps: 5000
+base_lr: 5e-4
+epochs: 2000
+
+run_name: gesture_model_6_letters
+use_ckpt_path: null
+save_ckpt_path: null
+# save_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/gesture/gesture_model
+save_every: 50
