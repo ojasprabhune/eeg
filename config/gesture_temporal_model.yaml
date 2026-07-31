@@ -1,0 +1,24 @@
+# gesture temporal model (EEG epoch -> gesture class, encoder + attention pooling)
+
+experiment: 6_letters
+input_type: bandpower # "bandpower" (84 features) or "raw" (14 channels)
+val_ratio: 0.2
+
+d_model: 64
+num_heads: 4
+num_layers: 2
+dropout: 0.3
+
+# training
+
+device: cpu
+batch_size: 16
+warmup_steps: 200
+base_lr: 5e-4
+epochs: 2000
+
+run_name: gesture_temporal_model_6_letters
+use_ckpt_path: null
+save_ckpt_path: null
+# save_ckpt_path: /Users/ojasprabhune/Documents/research/NORA/ckpts/gesture/gesture_temporal_model
+save_every: 50
