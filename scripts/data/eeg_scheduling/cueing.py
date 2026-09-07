@@ -24,18 +24,10 @@ def num_classes_for(experiment: str) -> int:
 # CONFIGURATION
 # ==========================
 
-EXPERIMENT = "6_letters"
-GESTURE_TYPE = "hand"
+EXPERIMENT = "common_8_letters"  # "asl_8_letters", "common_8_letters", "6_letters"
+GESTURE_TYPE = "discriminative"
 NUM_SENTENCES = 40
 START_TRIALS = 1
-
-GESTURE_LETTERS = [
-    "A",
-    "B",
-    "C",
-    "D",
-    "E",
-]
 
 TRIALS_PER_GESTURE = 1
 

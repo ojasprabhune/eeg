@@ -7,8 +7,8 @@ predicts the corresponding hand gesture labels.
 import math
 
 import torch
-import torch.nn as nn
 import yaml
+from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -111,6 +111,7 @@ if use_ckpt_path is not None:
 
 # --- validation ---
 
+
 def compute_f1(all_preds: torch.Tensor, all_labels: torch.Tensor, nc: int) -> float:
     """Compute macro F1 score."""
     f1s = []
@@ -123,6 +124,7 @@ def compute_f1(all_preds: torch.Tensor, all_labels: torch.Tensor, nc: int) -> fl
         f1 = 2 * prec * rec / (prec + rec) if (prec + rec) > 0 else 0.0
         f1s.append(f1)
     return sum(f1s) / len(f1s) if len(f1s) > 0 else 0.0
+
 
 def validate() -> tuple[float, float, float]:
     model.eval()
@@ -138,7 +140,7 @@ def validate() -> tuple[float, float, float]:
             labels = labels.to(device)
             logits = model(bp)
             loss = loss_fn(logits, labels)
-            
+
             total_loss += loss.item() * bp.size(0)
             preds = logits.argmax(dim=1)
             correct += (preds == labels).sum().item()
@@ -196,8 +198,16 @@ def train():
 
         # --- end-of-epoch validation ---
         val_loss, val_acc, val_f1 = validate()
-        run.log({"val_loss": val_loss, "val_acc": val_acc, "val_f1": val_f1, "epoch": i + 1})
-        epoch_tqdm.set_postfix({"val_loss": f"{val_loss:.4f}", "val_acc": f"{val_acc:.3f}", "val_f1": f"{val_f1:.3f}"})
+        run.log(
+            {"val_loss": val_loss, "val_acc": val_acc, "val_f1": val_f1, "epoch": i + 1}
+        )
+        epoch_tqdm.set_postfix(
+            {
+                "val_loss": f"{val_loss:.4f}",
+                "val_acc": f"{val_acc:.3f}",
+                "val_f1": f"{val_f1:.3f}",
+            }
+        )
 
         if (i + 1) % save_every == 0:
             latest_ckpt = {

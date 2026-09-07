@@ -1,7 +1,5 @@
 import numpy as np
-import os
-
-from eeg.data_collection import JointData, Joint, DataType
+import pywt
 
 EMOTIV_CHANNELS = [
     "AF3",
@@ -31,78 +29,6 @@ class Colors:
     ENDC = "\033[0m"
     BOLD = "\033[1m"
     UNDERLINE = "\033[4m"
-
-
-def appendages(joint_data: JointData) -> np.ndarray:
-    """
-    Uses joint data to calculate appendage vectors and
-    unit vectors to perform change of basis and return
-    an numpy array of size (T, 12).
-    """
-    origin = joint_data.get_positions(DataType.NORM, Joint.W)
-    mid_mcp = joint_data.get_positions(DataType.NORM, Joint.MM)
-    pinky_mcp = joint_data.get_positions(DataType.NORM, Joint.PM)
-
-    # unit vectors shapes: (T, 3)
-
-    unit_z = mid_mcp - origin  # vector from wrist to mid_mcp
-    # divide by magnitude (becomes unit vector)
-    unit_z /= np.linalg.norm(unit_z, axis=1, keepdims=True)
-
-    vec_y = pinky_mcp - origin
-    unit_x = np.cross(vec_y, unit_z)  # perpendicular
-    unit_x /= np.linalg.norm(unit_x, axis=1, keepdims=True)
-
-    unit_y = np.cross(unit_z, unit_x)
-
-    # rotational matrix for linear transformation with time steps
-    # (3, T, 3)
-    R: np.ndarray = np.array([-unit_x, -unit_y, unit_z])
-
-    R = R.transpose(1, 0, 2)  # (3, T, 3) -> (T, 3, 3)
-
-    def change_of_basis(tip_idx: Joint, mcp_idx: Joint) -> np.ndarray:
-        v = joint_data.get_positions(
-            DataType.WORLD, tip_idx
-        ) - joint_data.get_positions(DataType.WORLD, mcp_idx)  # (T, 3)
-
-        return np.matmul(R, v[:, :, None]).squeeze(-1)
-
-    # appendage vectors should be (T, 3)
-
-    index = change_of_basis(Joint.IT, Joint.IM)
-    middle = change_of_basis(Joint.MT, Joint.MM)
-    ring = change_of_basis(Joint.RT, Joint.RM)
-    thumb = change_of_basis(Joint.TT, Joint.TM)
-
-    # concats 4 fingers' 3 vector components horizontally, retaining time
-    result = np.concatenate([index, middle, ring, thumb], axis=1)  # (T, 12)
-
-    return result
-
-
-def process_deltas(data: np.ndarray) -> np.ndarray:
-    deltas = np.diff(data, axis=0)  # deltas
-    norm_deltas = normalize(deltas, deltas.max(), deltas.min(), 10, -10)
-    round_data = norm_deltas.round(decimals=1)
-    return round_data
-
-
-def normalize(
-    value,
-    old_max: float,
-    old_min: float,
-    new_max: float,
-    new_min: float,
-):
-    """
-    Converts a number range to another range while maintaining ratio.
-    """
-    old_range = old_max - old_min
-    new_range = new_max - new_min
-    new_value = (((value - old_min) * new_range) / old_range) + new_min
-
-    return new_value
 
 
 def compute_bandpower_features(
@@ -144,6 +70,7 @@ def compute_bandpower_features(
     }
 
     # pre-compute frequency masks for FFT bins of shape (nperseg//2 + 1,)
+    # this looks like [0, 1, 2, 3, 4, 5, ... 64]
     freqs = np.fft.rfftfreq(nperseg, d=1.0 / sfreq)
 
     # dictionary of boolean masks that says True for those frequencies that fall
@@ -206,7 +133,7 @@ def compute_bandpower_features(
             # start position for this channel's features in the output array
             base = ch * 6
 
-            bp = {}
+            bp = {}  # name: power
 
             # j is the index, and (name, mask) is the tuple of band name and its
             # corresponding frequency mask.
@@ -218,7 +145,7 @@ def compute_bandpower_features(
                 # in bp[name] (e.g., bp["mu"] = bandpower). bandpower is type
                 # float and is just a single number representing the total power
                 # in that frequency band
-                bp[name] = psd[mask, ch].sum()
+                bp[name] = psd[mask, ch].sum()  # 1 number
 
                 # i is time window index, and base + j is which band (0=theta,
                 # 1=mu, etc.) this stores the computed bandpower into the
@@ -238,54 +165,56 @@ def compute_bandpower_features(
     return features  # (T, 84)
 
 
-def min_max_npy(directory_path):
+def compute_dwt_features(
+    epoch: np.ndarray, wavelet: str = "coif1", level: int = 5
+) -> np.ndarray:
     """
-    Finds the overall minimum and maximum values across all .npy files in a given directory.
+    Compute wavelet-energy features from one epoch via the discrete wavelet
+    transform (DWT). Used by GestureDataset as an alternative to
+    compute_bandpower_features above - same idea (summarize how much signal
+    power is in different frequency bands) but computed with wavelets
+    instead of an FFT, which also keeps some information about *when* in the
+    epoch each frequency band was active (an FFT window only tells you how
+    much of a frequency was present, not when). "coif1" (Coiflet, 1
+    vanishing moment) is the same wavelet AlQattan & Sepulveda (2017) used
+    for EEG-based ASL sign classification.
 
-    Args:
-        directory_path (str): The path to the directory containing the .npy files.
+    Parameters
+    ----------
+    epoch : np.ndarray, shape (T, 14)
+        One raw filtered-channel epoch (e.g. one 3s motor-execution trial).
+    wavelet : str
+        Wavelet family to decompose with.
+    level : int
+        Number of decomposition levels.
 
-    Returns:
-        tuple: A tuple containing (overall_min, overall_max).
+    Returns
+    -------
+    features : np.ndarray, shape (14 * (level + 1),)
+        Per channel, in order: [energy(cA_level), energy(cD_level), ...,
+        energy(cD1)] - one approximation band plus `level` detail bands.
     """
-    overall_min = 0
-    overall_max = 0
-    found_npy_files = False
+    T, C = epoch.shape
 
-    for filename in os.listdir(directory_path):
-        if filename.endswith(".npy"):
-            filepath = os.path.join(directory_path, filename)
-            try:
-                data = np.load(filepath)
+    # one approximation-band energy + one energy per detail level, per channel
+    n_bands = level + 1
+    features = np.zeros(C * n_bands, dtype=np.float32)
 
-                # Initialize overall_min and overall_max with the first file's min/max
-                if not found_npy_files:
-                    overall_min = np.min(data)
-                    overall_max = np.max(data)
-                    found_npy_files = True
-                else:
-                    overall_min = min(overall_min, np.min(data))
-                    overall_max = max(overall_max, np.max(data))
+    for ch in range(C):
+        # pywt.wavedec repeatedly splits the signal into a smoothed "low
+        # frequency" half (the approximation) and a "high frequency" half
+        # (the detail), then re-splits the approximation again on the next
+        # level - each split roughly halves the frequency range it covers.
+        # coeffs comes back ordered coarsest-to-finest:
+        # [cA_level, cD_level, cD_level-1, ..., cD1]
+        coeffs = pywt.wavedec(epoch[:, ch], wavelet, level=level)
 
-            except Exception as e:
-                print(f"Error loading or processing {filename}: {e}")
+        for band_idx, band_coeffs in enumerate(coeffs):
+            # energy = sum of squared coefficients: one number summarizing
+            # how much signal power lives in that band, the same idea as the
+            # bandpower sum in compute_bandpower_features above but derived
+            # from wavelet coefficients instead of an FFT power spectrum
+            energy = np.sum(band_coeffs**2)
+            features[ch * n_bands + band_idx] = energy
 
-    return overall_min, overall_max
-
-
-if __name__ == "__main__":
-    # example usage:
-    # Replace with the actual path to your directory
-    directory = "/home/prabhune/projects/research/2026/eeg/data/"
-    min_val, max_val = min_max_npy(directory)
-
-    print(f"Minimum value: {min_val}")
-    print(f"Maximum value: {max_val}")
-
-    min_value = normalize(min_val, max_val, min_val, 1, -1)
-    max_value = normalize(max_val, max_val, min_val, 1, -1)
-    middle = normalize(-48.5, max_val, min_val, 1, -1)
-
-    print(f"Normalized Minimum value: {min_value}")
-    print(f"Normalized middle value: {middle}")
-    print(f"Normalized Maximum value: {max_value}")
+    return features  # (14 * (level + 1),)
