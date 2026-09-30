@@ -1,26 +1,23 @@
 """
 Runs every (model, input_type, fold) combination for the two gesture
-classifiers, one at a time in this one process. No subprocesses, no
-parallelism - launching 30 processes at once nearly filled the machine's RAM
-last time (see CLAUDE.md), and a plain sequential loop is a lot easier to
-reason about anyway. Just takes longer.
+classifiers, one at a time in this one process.
 """
 
 from train_gesture_model import train as train_gesture_model
 from train_gesture_temporal_model import train as train_gesture_temporal_model
 
 input_types = ["bandpower", "csp", "dwt"]
-k = 5
+k = 1
 
 results = {}
 
 for input_type in input_types:
-    for fold in range(k):
+    for fold in range(1, k + 1):
         val_acc = train_gesture_model(input_type=input_type, fold=fold)
         results[f"gesture_model/{input_type}/fold{fold}"] = val_acc
 
 for input_type in input_types:
-    for fold in range(k):
+    for fold in range(1, k + 1):
         val_acc = train_gesture_temporal_model(input_type=input_type, fold=fold)
         results[f"gesture_temporal_model/{input_type}/fold{fold}"] = val_acc
 

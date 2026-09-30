@@ -16,9 +16,9 @@ decoder_dropout: 0.1
 
 device: cpu
 batch_size: 8
-warmup_steps: 10000
+warmup_steps: 200
 base_lr: 5e-4
-epochs: 2000
+epochs: 100
 
 use_ckpt_path: null
 save_ckpt_path: null

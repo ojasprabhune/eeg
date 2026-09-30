@@ -6,17 +6,13 @@ from .transformer import PositionalEncoding
 
 class GestureModel(nn.Module):
     """
-    EEG features for one epoch (B, T, C) -> transformer encoder/decoder ->
-    a probability distribution over gesture classes for that ENTIRE epoch
-    (B, num_classes).
+    A transformer encoder and decoder model that takes in EEG features of
+    shape (B, T, C) of an epoch and outputs a probability distribution over
+    gesture classes for that ENTIRE epoch (B, num_classes).
 
-    The decoder is still doing real work though: instead of decoding a
-    token sequence, a single learnable query cross-attends onto the encoder's
-    memory and comes back out holding a pooled classification vector, the same
-    role <SOS> plays at the start of the language model's decoder, but taking
-    only one step since there's only one label per epoch. This keeps the same
-    TransformerEncoder + TransformerDecoder shape as the language model
-    while fitting a single-label task.
+    The decoder is unusual in that it uses a single learned query that
+    represents the predicted class for the epoch. It cross-attends into the
+    encoder's memory and has a pooled classification vector.
     """
 
     def __init__(
@@ -91,6 +87,7 @@ class GestureModel(nn.Module):
             src, src_key_padding_mask=src_pad_mask
         )  # (B, T, C)
 
+        # expand so that the same query is used for every batch
         query = self.query.expand(B, -1, -1)  # (B, 1, C)
 
         pooled = self.decoder(

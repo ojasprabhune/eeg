@@ -59,9 +59,7 @@ def select_input(
         return raw
     if input_type == "bandpower":
         return bp
-    # csp/dwt are one flat feature vector per trial (B, C), not a time
-    # series - unsqueeze a length-1 "time" dimension so they still fit the
-    # (B, T, C) shape the model expects.
+    # csp/dwt are one flat feature vector per trial (B, C), so add time dim
     if input_type == "csp":
         return csp.unsqueeze(1)  # (B, 6) -> (B, 1, 6)
     if input_type == "dwt":
