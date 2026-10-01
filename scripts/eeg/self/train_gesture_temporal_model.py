@@ -1,12 +1,8 @@
 """
 Trains GestureTemporalModel (transformer encoder + attention-pooling
 architecture) to predict a gesture class from one EEG epoch (raw channels,
-bandpower, CSP, or DWT features - see input_type below).
-
-train(input_type, fold) trains one model on one k-fold split and returns its
-val accuracy. To run every fold of one input_type, or to sweep several input
-types, just call train() again with different arguments - see
-run_gesture_sweep.py for that loop.
+bandpower, CSP, or DWT features). train(input_type, fold) trains one model on
+one k-fold split and returns its val accuracy.
 """
 
 import math

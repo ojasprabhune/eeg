@@ -3,12 +3,8 @@ For the Physionet EEG Motor Movement/Imagery Dataset.
 
 Trains GestureModel (transformer encoder + decoder-query architecture) to
 predict a gesture class from one EEG epoch (raw channels, bandpower, CSP, or
-DWT features - see input_type below).
-
-train(input_type, fold) trains one model on one k-fold split and returns its
-val accuracy. To run every fold of one input_type, or to sweep several input
-types, just call train() again with different arguments - see
-run_gesture_sweep.py for that loop.
+DWT features). train(input_type, fold) trains one model on one k-fold split and
+returns its val accuracy.
 """
 
 import math
@@ -38,6 +34,7 @@ with open("config/gesture_model.yaml", "r") as config_file:
     encoder_dropout = config["encoder_dropout"]
     decoder_dropout = config["decoder_dropout"]
 
+    num_recordings = config["num_recordings"]
     device = config["device"]
     batch_size = config["batch_size"]
     warmup_steps = config["warmup_steps"]
@@ -152,7 +149,7 @@ def train(input_type: str, fold: int, print_confusion_matrix: bool) -> float:
 
     dataset = get_cached_dataset(
         recordings_path="/Users/ojasprabhune/Documents/research/NORA/recordings/physio_net",
-        num_recordings=100,
+        num_recordings=num_recordings,
         k=k,
         fold=fold,
     )

@@ -11,6 +11,7 @@ dropout: 0.3
 
 # training
 
+num_recordings: 5
 device: cpu
 batch_size: 8
 warmup_steps: 500

@@ -1,20 +1,18 @@
 """
 For the Physionet EEG Motor Movement/Imagery Dataset.
 
-Unlike SVC/LDA in run_svm_lda.py (both solved in one shot - no
-"epoch" concept, no way to overfit with more training), SGDClassifier with
-loss="hinge" is sklearn's own name for "a linear SVM trained via stochastic
-gradient descent": it updates its weights a little at a time across many
-passes over the data, exactly like the transformer trainers do, so it can
-genuinely get better and then start overfitting the way a neural net does.
+run_svm_lda.py has SVC and and LDA that are solved in one shot without epochs,
+so theres no overfitting.GDClassifier with loss="hinge" is sklearn's own. It is
+a linear SVM trained via stochastic gradient descent. It updates its weights a
+little at a time across many passes over the data.
 
 Trains one SGD-linear-SVM per (input_type, fold), logging train/val
 accuracy to wandb every epoch, and stops each one early once val accuracy
-hasn't beaten its best in PATIENCE epochs - the plateau-then-decline curve
-this produces is the actual answer to "does more training help or hurt."
+hasn't beaten its best in patience epochs - once it plateaus, then stop.
 """
 
 import numpy as np
+import torch
 from sklearn.linear_model import SGDClassifier
 from sklearn.preprocessing import StandardScaler
 
@@ -22,6 +20,7 @@ import wandb
 from eeg.gesture2hand.datasets.physio_net_gesture_dataset import get_cached_dataset
 
 experiment = "common_8_letters"
+num_recordings = 5
 k = 5
 input_types = ["csp", "dwt"]
 max_epochs = 3000
@@ -33,6 +32,7 @@ def run_fold(
     labels: np.ndarray,
     train_idx: np.ndarray,
     val_idx: np.ndarray,
+    num_classes: int,
     run_name: str,
 ) -> tuple[int, float]:
     X_train = features[train_idx]
@@ -51,10 +51,6 @@ def run_fold(
 
     classifier = SGDClassifier(loss="hinge", random_state=42)
 
-    # partial_fit does exactly one gradient-descent pass ("epoch") over
-    # whatever data you hand it, instead of fit()'s "run until converged"
-    # behavior - that's what lets us stop it ourselves, mid-training,
-    # whenever we want
     rng = np.random.RandomState(42)
 
     run = wandb.init(
@@ -68,13 +64,17 @@ def run_fold(
     best_epoch = 0
     epochs_since_best = 0
 
+    confusion_matrix = torch.zeros(num_classes, num_classes, dtype=torch.int32)
+
+    print(X_train.shape, y_train.shape, X_val.shape, y_val.shape)
+    quit()
+
     for epoch in range(1, max_epochs + 1):
-        # shuffle the training rows into a new random order every epoch -
-        # SGD updates weights after looking at examples in whatever order
-        # they're given, so training on the exact same order every epoch
-        # would let it partly memorize that order instead of the actual
-        # class boundaries
+        # shuffle the training rows into a new random order every epoch so
+        # model can't memorize order
         perm = rng.permutation(len(X_train))
+
+        # partial means one pass, not full fit so we can stop it
         classifier.partial_fit(X_train[perm], y_train[perm], classes=classes)
 
         train_acc = classifier.score(X_train, y_train)
@@ -103,7 +103,7 @@ for input_type in input_types:
     for fold in range(k):
         dataset = get_cached_dataset(
             recordings_path="/Users/ojasprabhune/Documents/research/NORA/recordings/physio_net",
-            num_recordings=100,
+            num_recordings=num_recordings,
             k=k,
             fold=fold,
         )
@@ -115,6 +115,7 @@ for input_type in input_types:
             dataset.labels,
             dataset.train_idx,
             dataset.val_idx,
+            dataset.num_classes,
             run_name=f"sgd_svm_{input_type}_fold{fold}",
         )
         fold_results.append((best_epoch, best_val_acc))

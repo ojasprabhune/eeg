@@ -172,6 +172,7 @@ class PhysioNetGestureDataset(Dataset):
         self.fold = fold
 
         # --- stratified k-fold split --------------------------------------
+
         if k == 1:
             rng = np.random.RandomState(42)
             train_idx, val_idx = [], []

@@ -1,13 +1,8 @@
 """
 For the Physionet EEG Motor Movement/Imagery Dataset.
 
-Quick classical-ML baseline: SVM and LDA directly on the CSP and DWT
-per-trial feature vectors GestureDataset already computes, instead of
-feeding them through a transformer. Every paper we found that got good
-gesture-classification accuracy on a dataset this small used exactly this
-combination (hand-engineered features -> SVM or LDA), not a deep net - see
-CLAUDE.md "Modeling diagnosis". This is a fast sanity check (seconds, not
-hours) for whether CSP/DWT features carry separable signal at all.
+SVM and LDA ran directly on the CSP and DWT per-trial feature vectors that
+GestureDatasetmakes.
 """
 
 import numpy as np
@@ -18,6 +13,7 @@ from sklearn.svm import SVC
 from eeg.gesture2hand.datasets.physio_net_gesture_dataset import get_cached_dataset
 
 experiment = "common_8_letters"
+num_recordings = 5
 k = 5
 
 
@@ -50,7 +46,7 @@ lda_accuracies_dwt = []
 for fold in range(k):
     dataset = get_cached_dataset(
         recordings_path="/Users/ojasprabhune/Documents/research/NORA/recordings/physio_net",
-        num_recordings=100,
+        num_recordings=num_recordings,
         k=k,
         fold=fold,
     )

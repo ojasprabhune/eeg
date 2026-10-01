@@ -1,15 +1,12 @@
 """
-Unlike SVC/LDA in run_svm_lda.py (both solved in one shot - no
-"epoch" concept, no way to overfit with more training), SGDClassifier with
-loss="hinge" is sklearn's own name for "a linear SVM trained via stochastic
-gradient descent": it updates its weights a little at a time across many
-passes over the data, exactly like the transformer trainers do, so it can
-genuinely get better and then start overfitting the way a neural net does.
+run_svm_lda.py has SVC and and LDA that are solved in one shot without epochs,
+so theres no overfitting.GDClassifier with loss="hinge" is sklearn's own. It is
+a linear SVM trained via stochastic gradient descent. It updates its weights a
+little at a time across many passes over the data.
 
 Trains one SGD-linear-SVM per (input_type, fold), logging train/val
 accuracy to wandb every epoch, and stops each one early once val accuracy
-hasn't beaten its best in PATIENCE epochs - the plateau-then-decline curve
-this produces is the actual answer to "does more training help or hurt."
+hasn't beaten its best in patience epochs - once it plateaus, then stop.
 """
 
 import numpy as np
