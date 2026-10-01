@@ -166,7 +166,7 @@ class PhysioNetGestureDataset(Dataset):
             self.val_idx = np.array(sorted(val_idx), dtype=np.int64)
 
             print(
-                f"{Colors.OKBLUE}Fold {fold}/{k}: {len(self.train_idx)} train, "
+                f"{Colors.OKBLUE}Fold {fold + 1}/{k}: {len(self.train_idx)} train, "
                 f"{len(self.val_idx)} val{Colors.ENDC}"
             )
 

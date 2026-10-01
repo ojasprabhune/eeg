@@ -12,14 +12,14 @@ k = 1
 results = {}
 
 for input_type in input_types:
-    for fold in range(1, k + 1):
+    for fold in range(k):
         val_acc = train_gesture_model(input_type=input_type, fold=fold)
-        results[f"gesture_model/{input_type}/fold{fold}"] = val_acc
+        results[f"gesture_model/{input_type}/fold{fold + 1}"] = val_acc
 
 for input_type in input_types:
-    for fold in range(1, k + 1):
+    for fold in range(k):
         val_acc = train_gesture_temporal_model(input_type=input_type, fold=fold)
-        results[f"gesture_temporal_model/{input_type}/fold{fold}"] = val_acc
+        results[f"gesture_temporal_model/{input_type}/fold{fold + 1}"] = val_acc
 
 print("\nsweep done, final val_acc per run:")
 for name, val_acc in results.items():
