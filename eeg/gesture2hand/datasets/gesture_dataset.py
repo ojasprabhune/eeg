@@ -84,6 +84,16 @@ class GestureDataset(Dataset):
         self.dwt_epochs = np.array(dwt_epochs).astype(np.float32)
         self.labels = np.array(labels).astype(np.int64)
 
+        # range should be hundreds of uV, not 1e-5
+        for name, arr in [
+            ("raw", self.raw_epochs),
+            ("bp", self.bp_epochs),
+            ("dwt", self.dwt_epochs),
+        ]:
+            n_bad = (~np.isfinite(arr)).sum()
+            assert n_bad == 0, f"{name} epochs have {n_bad} non-finite values!"
+        print("Raw epoch uV range:", self.raw_epochs.min(), self.raw_epochs.max())
+
         # raw: (N, T_raw, 14)
         # bp: (N, T_bp, 84)
         # dwt: (N, 84)
@@ -187,9 +197,7 @@ class GestureDataset(Dataset):
         # same reasoning as the RuntimeWarning suppression around ICA above:
         # an internal pseudo-inverse step can warn on divide-by-zero/
         # overflow without producing NaN/Inf in the actual result (verified)
-        with mne.utils.use_log_level("error"), warnings.catch_warnings():
-            warnings.simplefilter("ignore", RuntimeWarning)
-
+        with mne.utils.use_log_level("warning"):
             # fit only on this fold's training epochs, never validation
             # epochs, so the spatial filters aren't chosen using information
             # from data we'll evaluate the model on later - the same
@@ -203,6 +211,11 @@ class GestureDataset(Dataset):
             # summarizing how much "power" that discriminative direction
             # carried during the trial
             self.csp_epochs = csp.transform(csp_input).astype(np.float32)  # (N, 6)
+
+        # range should be hundreds of uV, not 1e-5
+        n_bad = (~np.isfinite(self.csp_epochs)).sum()
+        assert n_bad == 0, f"CSP epochs have {n_bad} non-finite values!"
+        print("CSP epoch uV range:", self.csp_epochs.min(), self.csp_epochs.max())
 
         if verbose:
             print("CSP epochs shape:       ", self.csp_epochs.shape)
@@ -248,6 +261,8 @@ class GestureDataset(Dataset):
 
         # --- ICA artifact removal ------------------------------------
 
+        ica_raw = raw.copy().filter(l_freq=1.0, h_freq=None, verbose=False)
+
         # ICA (Independent Component Analysis) treats each of the 14
         # electrode channels as a different mixture (weighted sum) of the
         # same underlying set of source signals - some sources are brain
@@ -267,8 +282,14 @@ class GestureDataset(Dataset):
         # that problem.
         n_components = len(EMOTIV_CHANNELS) - 1
         ica = mne.preprocessing.ICA(
-            n_components=n_components, random_state=42, max_iter="auto", verbose=False
+            n_components=n_components,
+            method="picard",
+            random_state=42,
+            max_iter="auto",
+            verbose=False,
         )
+
+        data = ica_raw.get_data()
 
         # the pseudo-inverse mne computes internally at the end of fit() can
         # raise a harmless "divide by zero"/"overflow" RuntimeWarning when
@@ -277,7 +298,7 @@ class GestureDataset(Dataset):
         # so it's suppressed here rather than left to print noise every run
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", RuntimeWarning)
-            ica.fit(raw, verbose=False)
+            ica.fit(ica_raw, verbose=False)
 
             # find_bads_eog scores every component by how well its time
             # course correlates with an eye-movement channel and flags the
@@ -286,7 +307,9 @@ class GestureDataset(Dataset):
             # channel physically closest to the eyes - as a stand-in, a
             # common substitute on consumer EEG rigs without a real EOG
             # channel.
-            eog_component_idx, _ = ica.find_bads_eog(raw, ch_name="AF3", verbose=False)
+            eog_component_idx, _ = ica.find_bads_eog(
+                ica_raw, ch_name="AF3", verbose=False
+            )
 
         # tell ICA which components to drop, then reconstruct the 14
         # channels using only the remaining ("clean") components - this is
@@ -297,6 +320,8 @@ class GestureDataset(Dataset):
         raw.set_eeg_reference("average", projection=False, verbose=False)
 
         filtered: NDArray = raw.get_data().T  # (T, 14)
+
+        filtered = filtered * 1e6  # volts -> microvolts
 
         bp_features = compute_bandpower_features(
             filtered,

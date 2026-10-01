@@ -146,6 +146,16 @@ class PhysioNetGestureDataset(Dataset):
         self.dwt_epochs = np.stack(dwt_epochs).astype(np.float32)
         self.labels = np.array(labels, dtype=np.int64)
 
+        # range should be hundreds of uV, not 1e-5
+        for name, arr in [
+            ("raw", self.raw_epochs),
+            ("bp", self.bp_epochs),
+            ("dwt", self.dwt_epochs),
+        ]:
+            n_bad = (~np.isfinite(arr)).sum()
+            assert n_bad == 0, f"{name} epochs have {n_bad} non-finite values!"
+        print("Raw epoch uV range:", self.raw_epochs.min(), self.raw_epochs.max())
+
         # raw: (N, T_raw, 14)
         # bp: (N, T_bp, 84)
         # dwt: (N, 84)
@@ -220,12 +230,14 @@ class PhysioNetGestureDataset(Dataset):
 
         csp = mne.decoding.CSP(n_components=6, reg="ledoit_wolf", log=True)
 
-        with mne.utils.use_log_level("error"), warnings.catch_warnings():
-            warnings.simplefilter("ignore", RuntimeWarning)
-
+        with mne.utils.use_log_level("warning"):
             csp.fit(csp_input[self.train_idx], self.labels[self.train_idx])
-
             self.csp_epochs = csp.transform(csp_input).astype(np.float32)  # (N, 6)
+
+        # range should be hundreds of uV, not 1e-5
+        n_bad = (~np.isfinite(self.csp_epochs)).sum()
+        assert n_bad == 0, f"CSP epochs have {n_bad} non-finite values!"
+        print("CSP epoch uV range:", self.csp_epochs.min(), self.csp_epochs.max())
 
     def epoch_recording(
         self,
@@ -286,6 +298,8 @@ class PhysioNetGestureDataset(Dataset):
         raw.set_eeg_reference("average", projection=False, verbose=False)
 
         filtered: NDArray = raw.get_data().T  # (T, num_channels)
+
+        filtered = filtered * 1e6  # volts -> microvolts
 
         bp_features = compute_bandpower_features(
             filtered,

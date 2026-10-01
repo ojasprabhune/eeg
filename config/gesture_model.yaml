@@ -14,7 +14,7 @@ decoder_dropout: 0.1
 
 # training
 
-num_recordings: 5
+num_recordings: 3
 device: cpu
 batch_size: 8
 warmup_steps: 500
