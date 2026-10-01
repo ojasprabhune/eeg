@@ -42,7 +42,14 @@ with open("config/gesture_temporal_model.yaml", "r") as config_file:
     save_ckpt_path = config["save_ckpt_path"]
     save_every = config["save_every"]
 
-num_features_by_input_type = {"raw": 14, "bandpower": 84, "csp": 6, "dwt": 84}
+num_channels = 14
+num_features = 6
+num_features_by_input_type = {
+    "raw": num_channels,
+    "bandpower": num_channels * num_features,
+    "csp": num_features,
+    "dwt": num_channels * num_features,
+}
 
 
 def select_input(
@@ -56,13 +63,13 @@ def select_input(
         return raw
     if input_type == "bandpower":
         return bp
-    # csp/dwt are one flat feature vector per trial (B, C), not a time
-    # series - unsqueeze a length-1 "time" dimension so they still fit the
-    # (B, T, C) shape the model expects.
+    # csp/dwt are one flat feature vector per trial (B, C), so add time dim
     if input_type == "csp":
-        return csp.unsqueeze(1)  # (B, 6) -> (B, 1, 6)
+        return csp.unsqueeze(1)  # (B, num_features) -> (B, 1, num_features)
     if input_type == "dwt":
-        return dwt.unsqueeze(1)  # (B, 84) -> (B, 1, 84)
+        return dwt.unsqueeze(
+            1
+        )  # (B, num_channels * num_features) -> (B, 1, num_channels * num_features)
     raise ValueError(f"unknown input_type: {input_type}")
 
 
@@ -122,7 +129,7 @@ def validate(
     return avg_loss, accuracy, f1, confusion_matrix
 
 
-def train(input_type: str, fold: int) -> float:
+def train(input_type: str, fold: int, print_confusion_matrix: bool) -> float:
     """
     Trains one fresh GestureTemporalModel on this input_type/fold
     combination (fold's examples held out as val, the other k-1 folds used
@@ -252,7 +259,7 @@ def train(input_type: str, fold: int) -> float:
             {"val_loss": f"{val_loss:.4f}", "val_acc": f"{val_acc:.3f}"}
         )
 
-        if (i + 1) % 100 == 0:
+        if (i + 1) % 100 == 0 and print_confusion_matrix:
             print(f"\n{run_name} epoch {i + 1} validation confusion matrix:")
             print(confusion_matrix)
 
@@ -280,4 +287,4 @@ def train(input_type: str, fold: int) -> float:
 
 
 if __name__ == "__main__":
-    train(input_type=input_type, fold=0)
+    train(input_type=input_type, fold=0, print_confusion_matrix=False)

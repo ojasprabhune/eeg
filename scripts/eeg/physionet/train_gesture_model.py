@@ -1,4 +1,6 @@
 """
+For the Physionet EEG Motor Movement/Imagery Dataset.
+
 Trains GestureModel (transformer encoder + decoder-query architecture) to
 predict a gesture class from one EEG epoch (raw channels, bandpower, CSP, or
 DWT features - see input_type below).
@@ -18,7 +20,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 import wandb
-from eeg.gesture2hand import GestureDataset, GestureModel
+from eeg.gesture2hand import GestureModel, PhysioNetGestureDataset
 
 with open("config/gesture_model.yaml", "r") as config_file:
     config = yaml.safe_load(config_file)
@@ -45,7 +47,14 @@ with open("config/gesture_model.yaml", "r") as config_file:
     save_ckpt_path = config["save_ckpt_path"]
     save_every = config["save_every"]
 
-num_features_by_input_type = {"raw": 14, "bandpower": 84, "csp": 6, "dwt": 84}
+num_channels = 64
+num_features = 6
+num_features_by_input_type = {
+    "raw": num_channels,
+    "bandpower": num_channels * num_features,
+    "csp": num_features,
+    "dwt": num_channels * num_features,
+}
 
 
 def select_input(
@@ -61,9 +70,11 @@ def select_input(
         return bp
     # csp/dwt are one flat feature vector per trial (B, C), so add time dim
     if input_type == "csp":
-        return csp.unsqueeze(1)  # (B, 6) -> (B, 1, 6)
+        return csp.unsqueeze(1)  # (B, num_features) -> (B, 1, num_features)
     if input_type == "dwt":
-        return dwt.unsqueeze(1)  # (B, 84) -> (B, 1, 84)
+        return dwt.unsqueeze(
+            1
+        )  # (B, num_channels * num_features) -> (B, 1, num_channels * num_features)
     raise ValueError(f"unknown input_type: {input_type}")
 
 
@@ -138,11 +149,19 @@ def train(input_type: str, fold: int, print_confusion_matrix: bool) -> float:
 
     # --- data ---
 
-    train_dataset = GestureDataset(
-        experiment=experiment, mode="train", k=k, fold=fold, verbose=True
+    train_dataset = PhysioNetGestureDataset(
+        mode="train",
+        num_recordings=50,
+        k=k,
+        fold=fold,
+        verbose=True,
     )
-    val_dataset = GestureDataset(
-        experiment=experiment, mode="val", k=k, fold=fold, verbose=False
+    val_dataset = PhysioNetGestureDataset(
+        mode="val",
+        num_recordings=50,
+        k=k,
+        fold=fold,
+        verbose=False,
     )
 
     sample_weights, _ = train_dataset.get_sampler_weights()

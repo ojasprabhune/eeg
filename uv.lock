@@ -503,6 +503,7 @@ dependencies = [
     { name = "pandas" },
     { name = "pyarrow" },
     { name = "pylsl" },
+    { name = "python-picard" },
     { name = "pywavelets" },
     { name = "pywinusb" },
     { name = "pyxdf" },
@@ -542,6 +543,7 @@ requires-dist = [
     { name = "pandas", specifier = ">=2.3.1" },
     { name = "pyarrow", specifier = ">=22.0.0" },
     { name = "pylsl", specifier = ">=1.18.2" },
+    { name = "python-picard", specifier = ">=0.8.2" },
     { name = "pywavelets", specifier = ">=1.9.0" },
     { name = "pywinusb", specifier = ">=0.4.2" },
     { name = "pyxdf", specifier = ">=1.17.5" },
@@ -1889,6 +1891,20 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f0/26/19cadc79a718c5edbec86fd4919a6b6d3f681039a2f6d66d14be94e75fb9/python_dotenv-1.2.1.tar.gz", hash = "sha256:42667e897e16ab0d66954af0e60a9caa94f0fd4ecf3aaf6d2d260eec1aa36ad6", size = 44221, upload-time = "2025-10-26T15:12:10.434Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/14/1b/a298b06749107c305e1fe0f814c6c74aea7b2f1e10989cb30f544a1b3253/python_dotenv-1.2.1-py3-none-any.whl", hash = "sha256:b81ee9561e9ca4004139c6cbba3a238c32b03e4894671e181b671e8cb8425d61", size = 21230, upload-time = "2025-10-26T15:12:09.109Z" },
+]
+
+[[package]]
+name = "python-picard"
+version = "0.8.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "scikit-learn" },
+    { name = "scipy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a1/4b/cd049f1c742cd6005b3c2758b1568149da2f27d5e1b90ecfe662d5e52b82/python_picard-0.8.2.tar.gz", hash = "sha256:42259763f87673837dcc2772cc941139c8ee547093d1b970e95097393c628cde", size = 65272, upload-time = "2026-04-27T14:11:04.17Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/44/75/05ebe70bd6836877aaf60ac25db926041a806984d373d084d61092bc3cc0/python_picard-0.8.2-py3-none-any.whl", hash = "sha256:21d5762f40cef179596dd1eb66bbfd7518da8ae2a7ab772d864834fbe6dcd006", size = 16866, upload-time = "2026-04-27T14:11:02.688Z" },
 ]
 
 [[package]]

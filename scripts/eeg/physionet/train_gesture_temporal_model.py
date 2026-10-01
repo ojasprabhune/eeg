@@ -1,7 +1,9 @@
 """
-Trains GestureModel (transformer encoder + decoder-query architecture) to
-predict a gesture class from one EEG epoch (raw channels, bandpower, CSP, or
-DWT features - see input_type below).
+For the Physionet EEG Motor Movement/Imagery Dataset.
+
+Trains GestureTemporalModel (transformer encoder + attention-pooling
+architecture) to predict a gesture class from one EEG epoch (raw channels,
+bandpower, CSP, or DWT features - see input_type below).
 
 train(input_type, fold) trains one model on one k-fold split and returns its
 val accuracy. To run every fold of one input_type, or to sweep several input
@@ -18,22 +20,19 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 import wandb
-from eeg.gesture2hand import GestureDataset, GestureModel
+from eeg.gesture2hand import GestureTemporalModel, PhysioNetGestureDataset
 
-with open("config/gesture_model.yaml", "r") as config_file:
+with open("config/gesture_temporal_model.yaml", "r") as config_file:
     config = yaml.safe_load(config_file)
 
     experiment = config["experiment"]
     input_type = config["input_type"]
     k = config["k"]
 
-    num_layers = config["num_layers"]
-    decoder_num_layers = config["decoder_num_layers"]
+    d_model = config["d_model"]
     num_heads = config["num_heads"]
-    embedding_dim = config["embedding_dim"]
-    ffn_hidden_dim = config["ffn_hidden_dim"]
-    encoder_dropout = config["encoder_dropout"]
-    decoder_dropout = config["decoder_dropout"]
+    num_layers = config["num_layers"]
+    dropout = config["dropout"]
 
     device = config["device"]
     batch_size = config["batch_size"]
@@ -45,7 +44,14 @@ with open("config/gesture_model.yaml", "r") as config_file:
     save_ckpt_path = config["save_ckpt_path"]
     save_every = config["save_every"]
 
-num_features_by_input_type = {"raw": 14, "bandpower": 84, "csp": 6, "dwt": 84}
+num_channels = 64
+num_features = 6
+num_features_by_input_type = {
+    "raw": num_channels,
+    "bandpower": num_channels * num_features,
+    "csp": num_features,
+    "dwt": num_channels * num_features,
+}
 
 
 def select_input(
@@ -61,9 +67,11 @@ def select_input(
         return bp
     # csp/dwt are one flat feature vector per trial (B, C), so add time dim
     if input_type == "csp":
-        return csp.unsqueeze(1)  # (B, 6) -> (B, 1, 6)
+        return csp.unsqueeze(1)  # (B, num_features) -> (B, 1, num_features)
     if input_type == "dwt":
-        return dwt.unsqueeze(1)  # (B, 84) -> (B, 1, 84)
+        return dwt.unsqueeze(
+            1
+        )  # (B, num_channels * num_features) -> (B, 1, num_channels * num_features)
     raise ValueError(f"unknown input_type: {input_type}")
 
 
@@ -125,12 +133,12 @@ def validate(
 
 def train(input_type: str, fold: int, print_confusion_matrix: bool) -> float:
     """
-    Trains one fresh GestureModel on this input_type/fold combination
-    (fold's examples held out as val, the other k-1 folds used for train).
-    Returns the final val accuracy.
+    Trains one fresh GestureTemporalModel on this input_type/fold
+    combination (fold's examples held out as val, the other k-1 folds used
+    for train). Returns the final val accuracy.
     """
 
-    run_name = f"gesture_model_{experiment}_{input_type}_fold{fold}"
+    run_name = f"gesture_temporal_model_{experiment}_{input_type}_fold{fold}"
 
     print("\n=======================================")
     print(f"STARTING TRAINING FOR RUN: {run_name} FOR {epochs} EPOCHS")
@@ -138,14 +146,22 @@ def train(input_type: str, fold: int, print_confusion_matrix: bool) -> float:
 
     # --- data ---
 
-    train_dataset = GestureDataset(
-        experiment=experiment, mode="train", k=k, fold=fold, verbose=True
+    train_dataset = PhysioNetGestureDataset(
+        mode="train",
+        num_recordings=50,
+        k=k,
+        fold=fold,
+        verbose=True,
     )
-    val_dataset = GestureDataset(
-        experiment=experiment, mode="val", k=k, fold=fold, verbose=False
+    val_dataset = PhysioNetGestureDataset(
+        mode="val",
+        num_recordings=50,
+        k=k,
+        fold=fold,
+        verbose=False,
     )
 
-    sample_weights, _ = train_dataset.get_sampler_weights()
+    sample_weights, class_weights = train_dataset.get_sampler_weights()
     sampler = torch.utils.data.WeightedRandomSampler(
         weights=sample_weights,
         num_samples=len(sample_weights),
@@ -159,16 +175,13 @@ def train(input_type: str, fold: int, print_confusion_matrix: bool) -> float:
 
     num_features = num_features_by_input_type[input_type]
 
-    model = GestureModel(
+    model = GestureTemporalModel(
         num_features=num_features,
         num_classes=train_dataset.num_classes,
-        num_layers=num_layers,
-        decoder_num_layers=decoder_num_layers,
+        d_model=d_model,
         num_heads=num_heads,
-        embedding_dim=embedding_dim,
-        ffn_hidden_dim=ffn_hidden_dim,
-        encoder_dropout=encoder_dropout,
-        decoder_dropout=decoder_dropout,
+        num_layers=num_layers,
+        dropout=dropout,
     ).to(device)
 
     param_count = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -176,7 +189,7 @@ def train(input_type: str, fold: int, print_confusion_matrix: bool) -> float:
 
     # --- optimizer ---
 
-    loss_fn = nn.CrossEntropyLoss()
+    loss_fn = nn.CrossEntropyLoss(weight=class_weights.to(device))
     optimizer = torch.optim.AdamW(model.parameters(), lr=base_lr, weight_decay=0.01)
 
     def warmup_cosine_lr(step: int) -> float:
@@ -202,7 +215,7 @@ def train(input_type: str, fold: int, print_confusion_matrix: bool) -> float:
         project="eeg",
         config={
             "learning_rate": base_lr,
-            "architecture": "GestureModel",
+            "architecture": "GestureTemporalModel",
             "dataset": "gesture_dataset",
             "experiment": experiment,
             "input_type": input_type,

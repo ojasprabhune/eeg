@@ -229,6 +229,7 @@ class PhysioNetGestureDataset(Dataset):
 
         ica = mne.preprocessing.ICA(
             n_components=20,
+            method="picard",
             random_state=42,
             max_iter="auto",
             verbose=False,

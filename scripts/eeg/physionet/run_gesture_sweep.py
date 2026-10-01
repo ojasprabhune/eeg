@@ -1,4 +1,6 @@
 """
+For the Physionet EEG Motor Movement/Imagery Dataset.
+
 Runs every (model, input_type, fold) combination for the two gesture
 classifiers, one at a time in this one process for a specific
 experiment defined in the configuration.
@@ -15,22 +17,22 @@ k = 1
 results = {}
 
 for input_type in input_types:
-    for fold in range(k):
+    for fold in range(1, k + 1):
         val_acc = train_gesture_model(
             input_type=input_type,
             fold=fold,
             print_confusion_matrix=False,
         )
-        results[f"gesture_model/{input_type}/fold{fold + 1}"] = val_acc
+        results[f"gesture_model/{input_type}/fold{fold}"] = val_acc
 
 for input_type in input_types:
-    for fold in range(k):
+    for fold in range(1, k + 1):
         val_acc = train_gesture_temporal_model(
             input_type=input_type,
             fold=fold,
             print_confusion_matrix=False,
         )
-        results[f"gesture_temporal_model/{input_type}/fold{fold + 1}"] = val_acc
+        results[f"gesture_temporal_model/{input_type}/fold{fold}"] = val_acc
 
 print("\nsweep done, final val_acc per run:")
 for name, val_acc in results.items():
