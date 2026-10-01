@@ -23,7 +23,7 @@ from tqdm import tqdm
 import wandb
 from eeg.gesture2hand import EEGLinearBaseline, TemporalDataset
 
-with open("config/linear_temporal.yaml", "r") as config_file:
+with open("examples/eeg/config/linear_temporal.yaml", "r") as config_file:
     config = yaml.safe_load(config_file)
 
     stride = config["stride"]

@@ -15,7 +15,7 @@ from tqdm import tqdm
 
 from eeg.eeg_data import EEGDataset, EEGLLM
 
-with open("config/eeg_llm.yaml", "r") as config_file:
+with open("examples/eeg/config/eeg_llm.yaml", "r") as config_file:
     config = yaml.safe_load(config_file)
 
     vocab_size = config["vocab_size"]

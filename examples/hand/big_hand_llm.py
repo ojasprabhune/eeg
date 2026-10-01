@@ -14,7 +14,7 @@ from tqdm import tqdm
 
 from eeg.big_hand.position_llm import PositionLLM, AppendageDataset
 
-with open("config/log_position_llm.yaml", "r") as config_file:
+with open("examples/hand/config/log_position_llm.yaml", "r") as config_file:
     config = yaml.safe_load(config_file)
 
     batch_size = config["hyperparameters"]["batch_size"]

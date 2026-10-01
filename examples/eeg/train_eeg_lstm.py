@@ -15,7 +15,7 @@ from tqdm import tqdm
 
 from eeg.eeg_data import LSTMDataset, EEGLSTM
 
-with open("config/eeg_lstm.yaml", "r") as config_file:
+with open("examples/eeg/config/eeg_lstm.yaml", "r") as config_file:
     config = yaml.safe_load(config_file)
 
     vocab_size = config["vocab_size"]

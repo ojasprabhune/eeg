@@ -14,7 +14,7 @@ from tqdm import tqdm
 import wandb
 from eeg.language_model import LanguageDataset, LanguageModelLinear
 
-with open("config/language_model_linear.yaml", "r") as config_file:
+with open("examples/language/config/language_model_linear.yaml", "r") as config_file:
     config = yaml.safe_load(config_file)
 
     vocab_size = config["vocab_size"]

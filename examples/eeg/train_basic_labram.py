@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 from eeg.eeg_data import HandDataset, LabramModel
 
-with open("config/labram_basic_lin.yaml", "r") as config_file:
+with open("examples/eeg/config/labram_basic_lin.yaml", "r") as config_file:
     config = yaml.safe_load(config_file)
 
     base_lr = float(config["hyperparameters"]["base_lr"])
