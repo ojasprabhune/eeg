@@ -14,8 +14,7 @@ from .utils import (
     compute_dwt_features,
 )
 
-# cache for PhysioNetGestureDataset instances to avoid reloading and
-# reprocessing the same data multiple times
+# cache processed recordings so folds reuse the same data
 _dataset_cache = {}
 
 
@@ -25,7 +24,7 @@ def get_cached_dataset(
     k: int,
     fold: int,
 ) -> "PhysioNetGestureDataset":
-    cache_key = (recordings_path, num_recordings, k, fold)
+    cache_key = (recordings_path, num_recordings)
 
     if cache_key not in _dataset_cache:
         _dataset_cache[cache_key] = PhysioNetGestureDataset(
@@ -37,7 +36,9 @@ def get_cached_dataset(
             verbose=True,
         )
 
-    return _dataset_cache[cache_key]
+    dataset = _dataset_cache[cache_key]
+    dataset.set_fold(k, fold)
+    return dataset
 
 
 class PhysioNetGestureDataset(Dataset):
@@ -152,8 +153,25 @@ class PhysioNetGestureDataset(Dataset):
 
         print(f"{Colors.OKGREEN}Loaded {len(self.labels)} epochs.{Colors.ENDC}")
 
-        # --- stratified k-fold split --------------------------------------
+        self.set_fold(k, fold)
 
+        if verbose:
+            print(Colors.HEADER)
+            print("Raw epochs shape:       ", self.raw_epochs.shape)
+            print("Bandpower epochs shape: ", self.bp_epochs.shape)
+            print("DWT epochs shape:       ", self.dwt_epochs.shape)
+            print("CSP epochs shape:       ", self.csp_epochs.shape)
+            print("Labels shape:           ", self.labels.shape)
+            print(Colors.ENDC)
+
+    def set_fold(self, k: int, fold: int) -> None:
+        if getattr(self, "k", None) == k and getattr(self, "fold", None) == fold:
+            return
+
+        self.k = k
+        self.fold = fold
+
+        # --- stratified k-fold split --------------------------------------
         if k == 1:
             rng = np.random.RandomState(42)
             train_idx, val_idx = [], []
@@ -207,15 +225,6 @@ class PhysioNetGestureDataset(Dataset):
             csp.fit(csp_input[self.train_idx], self.labels[self.train_idx])
 
             self.csp_epochs = csp.transform(csp_input).astype(np.float32)  # (N, 6)
-
-        if verbose:
-            print(Colors.HEADER)
-            print("Raw epochs shape:       ", self.raw_epochs.shape)
-            print("Bandpower epochs shape: ", self.bp_epochs.shape)
-            print("DWT epochs shape:       ", self.dwt_epochs.shape)
-            print("CSP epochs shape:       ", self.csp_epochs.shape)
-            print("Labels shape:           ", self.labels.shape)
-            print(Colors.ENDC)
 
     def epoch_recording(
         self,
@@ -370,9 +379,6 @@ class PhysioNetGestureDataset(Dataset):
         )
 
     def get_split(self, mode: str) -> "PhysioNetGestureDataset":
-        if mode not in ["train", "val"]:
-            raise ValueError("mode must be 'train' or 'val'.")
-
         split_dataset = object.__new__(PhysioNetGestureDataset)
         split_dataset.__dict__ = self.__dict__.copy()
         split_dataset.mode = mode

@@ -149,7 +149,7 @@ def train(input_type: str, fold: int, print_confusion_matrix: bool) -> float:
 
     dataset = get_cached_dataset(
         recordings_path="/Users/ojasprabhune/Documents/research/NORA/recordings/physio_net",
-        num_recordings=50,
+        num_recordings=100,
         k=k,
         fold=fold,
     )

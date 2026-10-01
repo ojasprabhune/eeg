@@ -19,9 +19,9 @@ from sklearn.linear_model import SGDClassifier
 from sklearn.preprocessing import StandardScaler
 
 import wandb
-from eeg.gesture2hand import GestureDataset
+from eeg.gesture2hand.datasets.physio_net_gesture_dataset import get_cached_dataset
 
-experiment = "6_letters"
+experiment = "common_8_letters"
 k = 5
 input_types = ["csp", "dwt"]
 max_epochs = 3000
@@ -101,9 +101,13 @@ for input_type in input_types:
     fold_results = []
 
     for fold in range(k):
-        dataset = GestureDataset(
-            experiment=experiment, mode="train", k=k, fold=fold, verbose=False
+        dataset = get_cached_dataset(
+            recordings_path="/Users/ojasprabhune/Documents/research/NORA/recordings/physio_net",
+            num_recordings=100,
+            k=k,
+            fold=fold,
         )
+
         features = dataset.csp_epochs if input_type == "csp" else dataset.dwt_epochs
 
         best_epoch, best_val_acc = run_fold(
