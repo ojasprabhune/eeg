@@ -20,25 +20,16 @@ from .utils import (
 
 class GestureDataset(Dataset):
     """
-    Loads raw LSL/EmotivPRO recordings (.xdf) and slices out one epoch per
-    motor-execution trial, each epoch labeled with the gesture class that was
-    cued. Returns both a raw filtered-channel epoch and a bandpower epoch for
-    every trial, so models can be trained on either input independently.
+    Dataset to load raw LSL and EmotivPRO recordings as .xdf and slices out
+    epochs for motor execution trials. Each epoch is labeled with the gesture
+    class that was cued for it. It does preprocessing like ICA and low-, high-,
+    and bandpass filters on the EEG. We do CSP, DWT, and bandpower feature
+    extraction and return all four types (including raw) and labels.
 
     See notebooks/lsl.ipynb for the event/epoch extraction this is based on,
     and scripts/data/eeg_scheduling/cueing.py for how markers get written
     during recording: REST_START, CUE_{class}, PRE_{class}, MOVE_{class},
     END_SEQ, SESSION_END, where {class} is the 1-indexed gesture class.
-
-    Also runs three library-based EEG preprocessing/feature-extraction
-    techniques from our paper research (see CLAUDE.md "Modeling diagnosis"):
-    ICA artifact removal in `_epoch_session` (continuous-signal cleanup,
-    applied before epoching), and CSP + DWT feature extraction, both added
-    at the bottom of `__init__` (`self.csp_epochs`, `self.dwt_epochs`) as
-    two new per-trial feature arrays alongside `self.raw_epochs` /
-    `self.bp_epochs`. `__getitem__` returns all four (plus the label) so
-    `input_type: raw|bandpower|csp|dwt` in the trainer configs can select
-    any of them.
     """
 
     def __init__(
@@ -46,7 +37,7 @@ class GestureDataset(Dataset):
         experiment: str,
         recordings_path: str = "/Users/ojasprabhune/Documents/research/NORA/recordings/lsl/sub-P001/ses-S002/",
         mode: str = "train",
-        k: int = 5,
+        k: int = 1,
         fold: int = 0,
         motor_exec_sec: float = 3.0,
         bp_window_sec: float = 1.0,
@@ -59,7 +50,7 @@ class GestureDataset(Dataset):
         (matching cueing.py's MOTOR_EXEC), labeled with class - 1.
 
         k/fold pick one of k stratified cross-validation folds: fold's
-        examples become val, the other k-1 folds become train. Call this
+        examples become val, the other k-1 folds become train. We call this
         constructor once per fold (same k, fold=0..k-1) to run full k-fold CV.
         """
 
@@ -82,7 +73,7 @@ class GestureDataset(Dataset):
         if len(session_path) != 1:
             raise ValueError("Multiple files are in session path.")
 
-        raw_epochs, bp_epochs, dwt_epochs, labels = self._epoch_session(
+        raw_epochs, bp_epochs, dwt_epochs, labels = self.epoch_session(
             session_path[0],
             bp_window_sec=bp_window_sec,
             bp_step_samples=bp_step_samples,
@@ -115,9 +106,26 @@ class GestureDataset(Dataset):
         # val_idx with everything and train_idx with nothing (an empty
         # np.concatenate, which raises). Use this while not doing k-fold CV.
         if k == 1:
-            all_idx = np.arange(len(self.labels), dtype=np.int64)
-            self.train_idx = all_idx
-            self.val_idx = all_idx
+            rng = np.random.RandomState(42)
+            train_idx, val_idx = [], []
+
+            for cls in range(self.num_classes):
+                cls_idx = np.where(self.labels == cls)[0]
+                rng.shuffle(cls_idx)
+
+                split_idx = round(len(cls_idx) * 0.8)
+
+                train_idx.extend(cls_idx[:split_idx])
+                val_idx.extend(cls_idx[split_idx:])
+
+            self.train_idx = np.array(sorted(train_idx), dtype=np.int64)
+            self.val_idx = np.array(sorted(val_idx), dtype=np.int64)
+
+            print(
+                f"{Colors.OKBLUE}{len(self.train_idx)} train, "
+                f"{len(self.val_idx)} val{Colors.ENDC}\n"
+            )
+
         else:
             # each epoch is an isolated trial with rest periods on either side,
             # so unlike TemporalDataset's sliding windows there's no adjacency
@@ -140,10 +148,10 @@ class GestureDataset(Dataset):
             self.train_idx = np.array(sorted(train_idx), dtype=np.int64)
             self.val_idx = np.array(sorted(val_idx), dtype=np.int64)
 
-        print(
-            f"{Colors.OKBLUE}Fold {fold}/{k}: {len(self.train_idx)} train, "
-            f"{len(self.val_idx)} val{Colors.ENDC}\n"
-        )
+            print(
+                f"{Colors.OKBLUE}Fold {fold}/{k}: {len(self.train_idx)} train, "
+                f"{len(self.val_idx)} val{Colors.ENDC}\n"
+            )
 
         # --- CSP spatial-filter features -------------------------------
 
@@ -199,7 +207,7 @@ class GestureDataset(Dataset):
         if verbose:
             print("CSP epochs shape:       ", self.csp_epochs.shape)
 
-    def _epoch_session(
+    def epoch_session(
         self, path: Path, bp_window_sec: float, bp_step_samples: int
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
@@ -217,8 +225,7 @@ class GestureDataset(Dataset):
         """
         streams, _ = pyxdf.load_xdf(str(path))
 
-        # find streams by type rather than assuming a fixed order — pyxdf
-        # doesn't guarantee the EEG stream comes before the marker stream
+        # find specific streams by type
         eeg_stream = next(s for s in streams if s["info"]["type"][0] == "EEG")
         marker_stream = next(s for s in streams if s["info"]["type"][0] == "Markers")
 
