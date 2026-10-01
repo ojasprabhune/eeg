@@ -20,7 +20,8 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 import wandb
-from eeg.gesture2hand import GestureTemporalModel, PhysioNetGestureDataset
+from eeg.gesture2hand import GestureTemporalModel
+from eeg.gesture2hand.datasets.physio_net_gesture_dataset import get_cached_dataset
 
 with open("config/gesture_temporal_model.yaml", "r") as config_file:
     config = yaml.safe_load(config_file)
@@ -146,20 +147,14 @@ def train(input_type: str, fold: int, print_confusion_matrix: bool) -> float:
 
     # --- data ---
 
-    train_dataset = PhysioNetGestureDataset(
-        mode="train",
+    dataset = get_cached_dataset(
+        recordings_path="/Users/ojasprabhune/Documents/research/NORA/recordings/physio_net",
         num_recordings=50,
         k=k,
         fold=fold,
-        verbose=True,
     )
-    val_dataset = PhysioNetGestureDataset(
-        mode="val",
-        num_recordings=50,
-        k=k,
-        fold=fold,
-        verbose=False,
-    )
+    train_dataset = dataset.get_split("train")
+    val_dataset = dataset.get_split("val")
 
     sample_weights, class_weights = train_dataset.get_sampler_weights()
     sampler = torch.utils.data.WeightedRandomSampler(

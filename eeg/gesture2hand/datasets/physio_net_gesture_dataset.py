@@ -14,6 +14,31 @@ from .utils import (
     compute_dwt_features,
 )
 
+# cache for PhysioNetGestureDataset instances to avoid reloading and
+# reprocessing the same data multiple times
+_dataset_cache = {}
+
+
+def get_cached_dataset(
+    recordings_path: str,
+    num_recordings: int,
+    k: int,
+    fold: int,
+) -> "PhysioNetGestureDataset":
+    cache_key = (recordings_path, num_recordings, k, fold)
+
+    if cache_key not in _dataset_cache:
+        _dataset_cache[cache_key] = PhysioNetGestureDataset(
+            recordings_path=recordings_path,
+            num_recordings=num_recordings,
+            k=k,
+            fold=fold,
+            mode="train",
+            verbose=True,
+        )
+
+    return _dataset_cache[cache_key]
+
 
 class PhysioNetGestureDataset(Dataset):
     """
@@ -343,6 +368,15 @@ class PhysioNetGestureDataset(Dataset):
             torch.tensor(self.dwt_epochs[i]),
             torch.tensor(self.labels[i]),
         )
+
+    def get_split(self, mode: str) -> "PhysioNetGestureDataset":
+        if mode not in ["train", "val"]:
+            raise ValueError("mode must be 'train' or 'val'.")
+
+        split_dataset = object.__new__(PhysioNetGestureDataset)
+        split_dataset.__dict__ = self.__dict__.copy()
+        split_dataset.mode = mode
+        return split_dataset
 
     def get_sampler_weights(self) -> tuple[list[float], torch.Tensor]:
         """
