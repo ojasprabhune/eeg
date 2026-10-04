@@ -10,7 +10,7 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 
-from eeg.gesture2hand.datasets.physio_net_gesture_dataset import get_cached_dataset
+from eeg.gesture2hand import PhysioNetGestureDataset
 
 experiment = "common_8_letters"
 num_recordings = 5
@@ -44,12 +44,7 @@ lda_accuracies_csp = []
 lda_accuracies_dwt = []
 
 for fold in range(k):
-    dataset = get_cached_dataset(
-        recordings_path="/Users/ojasprabhune/Documents/research/NORA/recordings/physio_net",
-        num_recordings=num_recordings,
-        k=k,
-        fold=fold,
-    )
+    dataset = PhysioNetGestureDataset(split="subject", load_from_saved=True)
 
     acc = evaluate(
         dataset.csp_epochs,

@@ -1,7 +1,7 @@
 # gesture temporal model (EEG epoch -> gesture class, encoder + attention pooling)
 
 experiment: common_8_letters
-input_type: raw # "raw" (14 ch), "bandpower" (84 feat), "csp" (6 feat), or "dwt" (84 feat) - used when running this file directly
+input_type: bandpower # "raw" (14 ch), "bandpower" (84 feat), "csp" (6 feat), or "dwt" (84 feat) - used when running this file directly
 
 d_model: 32
 num_heads: 2
@@ -12,7 +12,7 @@ dropout: 0.3
 
 num_recordings: 3
 device: cpu
-batch_size: 8
+batch_size: 32
 warmup_steps: 500
 base_lr: 5e-4
 epochs: 500

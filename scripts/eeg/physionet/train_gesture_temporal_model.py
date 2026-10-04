@@ -16,15 +16,13 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 import wandb
-from eeg.gesture2hand import GestureTemporalModel
-from eeg.gesture2hand.datasets.physio_net_gesture_dataset import get_cached_dataset
+from eeg.gesture2hand import GestureTemporalModel, PhysioNetGestureDataset
 
 with open("config/gesture_temporal_model.yaml", "r") as config_file:
     config = yaml.safe_load(config_file)
 
     experiment = config["experiment"]
     input_type = config["input_type"]
-    k = config["k"]
 
     d_model = config["d_model"]
     num_heads = config["num_heads"]
@@ -129,14 +127,14 @@ def validate(
     return avg_loss, accuracy, f1, confusion_matrix
 
 
-def train(input_type: str, fold: int, print_confusion_matrix: bool) -> float:
+def train(input_type: str, print_confusion_matrix: bool) -> float:
     """
     Trains one fresh GestureTemporalModel on this input_type/fold
     combination (fold's examples held out as val, the other k-1 folds used
     for train). Returns the final val accuracy.
     """
 
-    run_name = f"gesture_temporal_model_{experiment}_{input_type}_fold{fold}"
+    run_name = f"gesture_temporal_model_{experiment}_{input_type}"
 
     print("\n=======================================")
     print(f"STARTING TRAINING FOR RUN: {run_name} FOR {epochs} EPOCHS")
@@ -144,12 +142,12 @@ def train(input_type: str, fold: int, print_confusion_matrix: bool) -> float:
 
     # --- data ---
 
-    dataset = get_cached_dataset(
-        recordings_path="/Users/ojasprabhune/Documents/research/NORA/recordings/physio_net",
-        num_recordings=num_recordings,
-        k=k,
-        fold=fold,
+    dataset = PhysioNetGestureDataset(
+        split="subject",
+        load_from_saved=True,
+        verbose=True,
     )
+
     train_dataset = dataset.get_split("train")
     val_dataset = dataset.get_split("val")
 
@@ -212,8 +210,6 @@ def train(input_type: str, fold: int, print_confusion_matrix: bool) -> float:
             "experiment": experiment,
             "input_type": input_type,
             "epochs": epochs,
-            "k": k,
-            "fold": fold,
         },
     )
 
@@ -289,4 +285,4 @@ def train(input_type: str, fold: int, print_confusion_matrix: bool) -> float:
 
 
 if __name__ == "__main__":
-    train(input_type=input_type, fold=0, print_confusion_matrix=False)
+    train(input_type=input_type, print_confusion_matrix=False)

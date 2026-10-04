@@ -39,7 +39,8 @@ class PhysioNetGestureDataset(Dataset):
         split: str = "subject",
         num_recordings: int = -1,
         load_from_saved: bool = True,
-        motor_exec_sec: float = 4.0,
+        motor_exec_sec: float = 2.5,
+        epoch_start_sec: float = 0.5,
         bp_window_sec: float = 1.0,
         bp_step_samples: int = 4,
         verbose: bool = False,
@@ -68,6 +69,9 @@ class PhysioNetGestureDataset(Dataset):
         self.verbose = verbose
         self.mode = mode
         self.motor_exec_sec = motor_exec_sec
+        self.epoch_start_sec = epoch_start_sec
+        self.bp_window_sec = bp_window_sec
+        self.bp_step_samples = bp_step_samples
 
         super().__init__()
 
@@ -119,12 +123,7 @@ class PhysioNetGestureDataset(Dataset):
 
             for path in recording_paths:
                 run = path.stem[-2:]
-                recording_epochs = self.epoch_recording(
-                    path,
-                    run_labels[run],
-                    bp_window_sec=bp_window_sec,
-                    bp_step_samples=bp_step_samples,
-                )
+                recording_epochs = self.epoch_recording(path, run_labels[run])
                 raw_epochs.extend(recording_epochs[0])
                 bp_epochs.extend(recording_epochs[1])
                 dwt_epochs.extend(recording_epochs[2])
@@ -143,7 +142,9 @@ class PhysioNetGestureDataset(Dataset):
 
             self.raw_epochs = np.stack(raw_epochs).astype(np.float32)
             self.bp_epochs = np.stack(bp_epochs).astype(np.float32)
-            self.dwt_epochs = np.stack(dwt_epochs).astype(np.float32)
+            self.dwt_epochs = np.log(
+                np.stack(dwt_epochs).astype(np.float64) + 1e-6
+            ).astype(np.float32)
             self.labels = np.array(labels, dtype=np.int64)
             self.subject_ids = np.array(subject_ids)
 
@@ -208,6 +209,8 @@ class PhysioNetGestureDataset(Dataset):
 
         # --- CSP spatial-filter features -------------------------------------
 
+        print(f"\n{Colors.OKBLUE}Fitting CSP...{Colors.ENDC}")
+
         csp_input = self.raw_epochs.transpose(0, 2, 1).astype(np.float64)
 
         csp = mne.decoding.CSP(n_components=6, reg="ledoit_wolf", log=True)
@@ -235,8 +238,6 @@ class PhysioNetGestureDataset(Dataset):
         self,
         path: Path,
         run_labels: dict[str, int],
-        bp_window_sec: float,
-        bp_step_samples: int,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
         Loads one EDF run and slices out fixed-length movement epochs.
@@ -298,12 +299,12 @@ class PhysioNetGestureDataset(Dataset):
         bp_features = compute_bandpower_features(
             filtered,
             sfreq=sfreq,
-            window_sec=bp_window_sec,
-            step_samples_128=bp_step_samples,
+            window_sec=self.bp_window_sec,
+            step_samples_128=self.bp_step_samples,
         )  # (T_bp, num_channels * 6)
-        bp_rate = sfreq / bp_step_samples  # bandpower timesteps per second
+        bp_rate = sfreq / self.bp_step_samples  # bandpower timesteps per second
         nperseg = int(
-            bp_window_sec * sfreq
+            self.bp_window_sec * sfreq
         )  # number of raw samples in one bandpower window
         bp_offset = (
             (nperseg // 2) / sfreq
@@ -318,7 +319,7 @@ class PhysioNetGestureDataset(Dataset):
             self.motor_exec_sec * sfreq
         )  # number of raw samples in a 3s epoch
         t_bp = (
-            round((self.motor_exec_sec - bp_window_sec) * bp_rate) + 1
+            round((self.motor_exec_sec - self.bp_window_sec) * bp_rate) + 1
         )  # number of bandpower timesteps in a 3s epoch
 
         raw_epochs, bp_epochs, dwt_epochs, labels = [], [], [], []
@@ -328,8 +329,10 @@ class PhysioNetGestureDataset(Dataset):
             if event[2] not in event_codes:
                 continue
 
+            # event[0] is the sample index of the event
+            # raw.first_samp is the sample index of the first sample in the raw data
             cls = event_codes[event[2]]
-            onset_raw = event[0] - raw.first_samp
+            onset_raw = event[0] - raw.first_samp + round(self.epoch_start_sec * sfreq)
             onset_time = onset_raw / sfreq
             onset_bp = int(np.searchsorted(bp_times, onset_time))
 
