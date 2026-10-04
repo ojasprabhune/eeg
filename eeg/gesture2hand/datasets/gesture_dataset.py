@@ -17,6 +17,8 @@ from .utils import (
     compute_dwt_features,
 )
 
+np.seterr(all="ignore")
+
 
 class GestureDataset(Dataset):
     """
@@ -70,8 +72,6 @@ class GestureDataset(Dataset):
         print(f"{Colors.OKBLUE}Getting recordings...{Colors.ENDC}")
 
         session_path = sorted(Path(recordings_path).rglob("*_eeg.xdf"))
-        if len(session_path) != 1:
-            raise ValueError("Multiple files are in session path.")
 
         raw_epochs, bp_epochs, dwt_epochs, labels = self.epoch_session(
             session_path[0],
@@ -254,6 +254,8 @@ class GestureDataset(Dataset):
         info = mne.create_info(ch_names=EMOTIV_CHANNELS, sfreq=sfreq, ch_types="eeg")
         raw = mne.io.RawArray(data, info, verbose=False)
 
+        raw._data *= 1e6  # volts -> uV
+
         # same filtering pipeline as TemporalDataset: wideband, line-noise
         # notch, common average reference
         raw.filter(l_freq=0.1, h_freq=50, verbose=False)
@@ -320,8 +322,6 @@ class GestureDataset(Dataset):
         raw.set_eeg_reference("average", projection=False, verbose=False)
 
         filtered: NDArray = raw.get_data().T  # (T, 14)
-
-        filtered = filtered * 1e6  # volts -> microvolts
 
         bp_features = compute_bandpower_features(
             filtered,

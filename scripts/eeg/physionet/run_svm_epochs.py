@@ -1,49 +1,41 @@
 """
 For the Physionet EEG Motor Movement/Imagery Dataset.
 
-run_svm_lda.py has SVC and and LDA that are solved in one shot without epochs,
-so theres no overfitting.GDClassifier with loss="hinge" is sklearn's own. It is
-a linear SVM trained via stochastic gradient descent. It updates its weights a
+run_svm_lda.py has SVC and LDA that are solved in one shot without epochs,
+so there's no overfitting. SGDClassifier with loss="hinge" is sklearn's own
+linear SVM trained via stochastic gradient descent. It updates its weights a
 little at a time across many passes over the data.
 
-Trains one SGD-linear-SVM per (input_type, fold), logging train/val
-accuracy to wandb every epoch, and stops each one early once val accuracy
-hasn't beaten its best in patience epochs - once it plateaus, then stop.
+Trains one SGD linear SVM per input type on the subject split, logging
+train/val accuracy to wandb every epoch, and stops early once val accuracy
+hasn't beaten its best in `patience` epochs - once it plateaus, then stop.
 """
 
 import os
 
 import numpy as np
-import torch
 from sklearn.linear_model import SGDClassifier
+from sklearn.metrics import balanced_accuracy_score, confusion_matrix
 from sklearn.preprocessing import StandardScaler
 
 import wandb
-from eeg.gesture2hand.datasets.physio_net_gesture_dataset import get_cached_dataset
+from eeg.gesture2hand import PhysioNetGestureDataset
 
 os.environ["WANDB_SILENT"] = "True"  # make wandb shh
+np.seterr(all="ignore")
 
-experiment = "common_8_letters"
-num_recordings = 6
-k = 1
 input_types = ["csp", "dwt"]
 max_epochs = 3000
 patience = 300  # stop once val_acc hasn't beaten its best in this many epochs
 
-confusion_matrices = []
 
-for input_type in input_types:
-    confusion_matrices.append([])
-
-
-def run_fold(
+def run_one(
     features: np.ndarray,
     labels: np.ndarray,
     train_idx: np.ndarray,
     val_idx: np.ndarray,
-    num_classes: int,
     run_name: str,
-) -> tuple[int, float, torch.Tensor]:
+) -> tuple[int, float]:
     X_train = features[train_idx]
     y_train = labels[train_idx]
     X_val = features[val_idx]
@@ -71,10 +63,8 @@ def run_fold(
 
     best_val_acc = 0.0
     best_epoch = 0
+    best_y_preds = np.zeros_like(y_val)
     epochs_since_best = 0
-
-    confusion_matrix = torch.zeros(num_classes, num_classes, dtype=torch.int32)
-    best_confusion_matrix = confusion_matrix
 
     for epoch in range(1, max_epochs + 1):
         # shuffle the training rows into a new random order every epoch so
@@ -89,14 +79,11 @@ def run_fold(
         val_acc = classifier.score(X_val, y_val)
         run.log({"epoch": epoch, "train_acc": train_acc, "val_acc": val_acc})
 
-        for i in range(len(y_val)):
-            confusion_matrix[y_val[i]][y_preds[i]] += 1
-
         if val_acc > best_val_acc:
             best_val_acc = val_acc
             best_epoch = epoch
+            best_y_preds = y_preds  # predictions at the best epoch
             epochs_since_best = 0
-            best_confusion_matrix = confusion_matrix.clone()
         else:
             epochs_since_best += 1
 
@@ -106,48 +93,34 @@ def run_fold(
     run.log({"best_epoch": best_epoch, "best_val_acc": best_val_acc})
     run.finish()
 
-    return best_epoch, best_val_acc, best_confusion_matrix
+    # --- diagnostics at the best epoch ---------------------------------------
+    # classes: 0 left fist, 1 right fist, 2 both fists, 3 both feet
+    # y // 2 gives the block: 0 = left/right fist, 1 = both fists/both feet
+    print(f"\n{run_name} confusion matrix (rows = true, cols = predicted):")
+    print(confusion_matrix(y_val, best_y_preds, labels=[0, 1, 2, 3]))
+    print("balanced acc:", balanced_accuracy_score(y_val, best_y_preds))
 
-
-for i, input_type in enumerate(input_types):
-    fold_results = []
-    fold_confusion_matrices = []
-
-    for fold in range(k):
-        dataset = get_cached_dataset(
-            recordings_path="/Users/ojasprabhune/Documents/research/NORA/recordings/physio_net",
-            num_recordings=num_recordings,
-            k=k,
-            fold=fold,
-        )
-
-        features = dataset.csp_epochs if input_type == "csp" else dataset.dwt_epochs
-
-        best_epoch, best_val_acc, fold_confusion_matrix = run_fold(
-            features,
-            dataset.labels,
-            dataset.train_idx,
-            dataset.val_idx,
-            dataset.num_classes,
-            run_name=f"sgd_svm_{input_type}_fold{fold}",
-        )
-
-        fold_results.append((best_epoch, best_val_acc))
-        fold_confusion_matrices.append(fold_confusion_matrix)
-
-        print(
-            f"{input_type} fold {fold}: stopped at epoch {best_epoch}, "
-            f"best val_acc {best_val_acc:.3f}"
-        )
-
-    accs = np.array([acc for _, acc in fold_results])
-    epochs_stopped = np.array([ep for ep, _ in fold_results])
-
+    same_block = (best_y_preds // 2) == (y_val // 2)
+    print("block acc:", same_block.mean())
     print(
-        f"\n{input_type}: best val_acc {accs.mean():.3f} +/- {accs.std():.3f}, "
-        f"stopped at epoch {epochs_stopped.mean():.0f} +/- {epochs_stopped.std():.0f}\n"
+        "within-block acc:",
+        (best_y_preds[same_block] == y_val[same_block]).mean(),
     )
 
-    confusion_matrices[i] = fold_confusion_matrices
+    return best_epoch, best_val_acc
 
-print(confusion_matrices)
+
+dataset = PhysioNetGestureDataset(split="subject", load_from_saved=True)
+
+for input_type in input_types:
+    features = dataset.csp_epochs if input_type == "csp" else dataset.dwt_epochs
+
+    best_epoch, best_val_acc = run_one(
+        features,
+        dataset.labels,
+        dataset.train_idx,
+        dataset.val_idx,
+        run_name=f"sgd_svm_{input_type}",
+    )
+
+    print(f"{input_type}: best epoch {best_epoch}, best val_acc {best_val_acc:.3f}\n")

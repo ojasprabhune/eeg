@@ -2,7 +2,6 @@
 
 experiment: common_8_letters
 input_type: raw # "raw" (14 ch), "bandpower" (84 feat), "csp" (6 feat), or "dwt" (84 feat) - used when running this file directly
-k: 5 # number of cross-validation folds
 
 d_model: 32
 num_heads: 2

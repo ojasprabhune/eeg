@@ -14,31 +14,7 @@ from .utils import (
     compute_dwt_features,
 )
 
-# cache processed recordings so folds reuse the same data
-_dataset_cache = {}
-
-
-def get_cached_dataset(
-    recordings_path: str,
-    num_recordings: int,
-    k: int,
-    fold: int,
-) -> "PhysioNetGestureDataset":
-    cache_key = (recordings_path, num_recordings)
-
-    if cache_key not in _dataset_cache:
-        _dataset_cache[cache_key] = PhysioNetGestureDataset(
-            recordings_path=recordings_path,
-            num_recordings=num_recordings,
-            k=k,
-            fold=fold,
-            mode="train",
-            verbose=True,
-        )
-
-    dataset = _dataset_cache[cache_key]
-    dataset.set_fold(k, fold)
-    return dataset
+np.seterr(all="ignore")
 
 
 class PhysioNetGestureDataset(Dataset):
@@ -58,10 +34,11 @@ class PhysioNetGestureDataset(Dataset):
     def __init__(
         self,
         recordings_path: str = "/Users/ojasprabhune/Documents/research/NORA/recordings/physio_net",
+        save_path: str = "/Users/ojasprabhune/Documents/research/NORA/recordings/physio_net/dataset",
         mode: str = "train",
+        split: str = "subject",
         num_recordings: int = -1,
-        k: int = 1,
-        fold: int = 0,
+        load_from_saved: bool = True,
         motor_exec_sec: float = 4.0,
         bp_window_sec: float = 1.0,
         bp_step_samples: int = 4,
@@ -71,15 +48,18 @@ class PhysioNetGestureDataset(Dataset):
         Reads executed-movement EDF runs under recordings_path. The four
         labels are left fist, right fist, both fists, and both feet.
 
-        k/fold pick one of k stratified cross-validation folds: fold's
-        examples become val, the other k-1 folds become train. We call this
-        constructor once per fold (same k, fold=0..k-1) to run full k-fold CV.
-
         The pipeline is like this:
             1. ICA cleans the recording before any epochs are taken.
             2. Bandpower finds features over time, which then get sliced.
             3. DWT takes each sliced movement epoch, and finds the features.
             4. CSP fits on the trained epochs.
+
+        If load_from_saved is True, the dataset will load from the saved path
+        instead of reprocessing the EDF files. If load_from_saved is False, the
+        dataset will reprocess the EDF files and save them to the save_path.
+
+        If num_recordings is -1, all recordings are used. If num_recordings is
+        specified, then only that many recordings are used after getting EDF.
         """
 
         print(
@@ -115,78 +95,87 @@ class PhysioNetGestureDataset(Dataset):
         if num_recordings != -1:
             recording_paths = recording_paths[:num_recordings]
 
-        start = time.time()
-        print(
-            f"{Colors.OKBLUE}Getting {len(recording_paths)} recordings...{Colors.ENDC}"
-        )
+        if load_from_saved:  # load from saved path instead of reprocessing EDF files
+            self.raw_epochs = np.load(Path(save_path) / "raw_epochs.npy")
+            self.bp_epochs = np.load(Path(save_path) / "bp_epochs.npy")
+            self.dwt_epochs = np.load(Path(save_path) / "dwt_epochs.npy")
+            self.csp_epochs = np.load(Path(save_path) / "csp_epochs.npy")
+            self.labels = np.load(Path(save_path) / "labels.npy")
+            self.subject_ids = np.load(Path(save_path) / "subject_ids.npy")
 
-        raw_epochs, bp_epochs, dwt_epochs, labels = [], [], [], []
-        for path in recording_paths:
-            run = path.stem[-2:]
-            recording_epochs = self.epoch_recording(
-                path,
-                run_labels[run],
-                bp_window_sec=bp_window_sec,
-                bp_step_samples=bp_step_samples,
+            print(
+                f"{Colors.OKGREEN}Loaded {len(self.labels)} epochs from "
+                f"{save_path}{Colors.ENDC}"
             )
-            raw_epochs.extend(recording_epochs[0])
-            bp_epochs.extend(recording_epochs[1])
-            dwt_epochs.extend(recording_epochs[2])
-            labels.extend(recording_epochs[3])
 
-        elapsed = time.time() - start
+        else:
+            start = time.time()
 
-        print(
-            f"{Colors.OKGREEN}Took {elapsed:.0f} seconds to get "
-            f"{len(recording_paths)} recordings...{Colors.ENDC}"
-        )
+            print(
+                f"{Colors.OKBLUE}Getting {len(recording_paths)} recordings...{Colors.ENDC}"
+            )
 
-        self.raw_epochs = np.stack(raw_epochs).astype(np.float32)
-        self.bp_epochs = np.stack(bp_epochs).astype(np.float32)
-        self.dwt_epochs = np.stack(dwt_epochs).astype(np.float32)
-        self.labels = np.array(labels, dtype=np.int64)
+            raw_epochs, bp_epochs, dwt_epochs, labels, subject_ids = [], [], [], [], []
 
-        # range should be hundreds of uV, not 1e-5
-        for name, arr in [
-            ("raw", self.raw_epochs),
-            ("bp", self.bp_epochs),
-            ("dwt", self.dwt_epochs),
-        ]:
-            n_bad = (~np.isfinite(arr)).sum()
-            assert n_bad == 0, f"{name} epochs have {n_bad} non-finite values!"
-        print("Raw epoch uV range:", self.raw_epochs.min(), self.raw_epochs.max())
+            for path in recording_paths:
+                run = path.stem[-2:]
+                recording_epochs = self.epoch_recording(
+                    path,
+                    run_labels[run],
+                    bp_window_sec=bp_window_sec,
+                    bp_step_samples=bp_step_samples,
+                )
+                raw_epochs.extend(recording_epochs[0])
+                bp_epochs.extend(recording_epochs[1])
+                dwt_epochs.extend(recording_epochs[2])
+                labels.extend(recording_epochs[3])
 
-        # raw: (N, T_raw, 14)
-        # bp: (N, T_bp, 84)
-        # dwt: (N, 84)
-        # labels: (N,)
+                # the subject id is the first 4 characters of the filename
+                n_new = len(recording_epochs[3])
+                subject_ids.extend([path.stem[:4]] * n_new)
 
-        print(f"{Colors.OKGREEN}Loaded {len(self.labels)} epochs.{Colors.ENDC}")
+            elapsed = time.time() - start
 
-        self.set_fold(k, fold)
+            print(
+                f"{Colors.OKGREEN}Took {elapsed:.0f} seconds to get "
+                f"{len(recording_paths)} recordings...{Colors.ENDC}"
+            )
 
-        if verbose:
-            print(Colors.HEADER)
-            print("Raw epochs shape:       ", self.raw_epochs.shape)
-            print("Bandpower epochs shape: ", self.bp_epochs.shape)
-            print("DWT epochs shape:       ", self.dwt_epochs.shape)
-            print("CSP epochs shape:       ", self.csp_epochs.shape)
-            print("Labels shape:           ", self.labels.shape)
-            print(Colors.ENDC)
+            self.raw_epochs = np.stack(raw_epochs).astype(np.float32)
+            self.bp_epochs = np.stack(bp_epochs).astype(np.float32)
+            self.dwt_epochs = np.stack(dwt_epochs).astype(np.float32)
+            self.labels = np.array(labels, dtype=np.int64)
+            self.subject_ids = np.array(subject_ids)
 
-    def set_fold(self, k: int, fold: int) -> None:
-        if getattr(self, "k", None) == k and getattr(self, "fold", None) == fold:
-            return
+            # range should be hundreds of uV, not 1e-5
+            for name, arr in [
+                ("raw", self.raw_epochs),
+                ("bp", self.bp_epochs),
+                ("dwt", self.dwt_epochs),
+            ]:
+                n_bad = (~np.isfinite(arr)).sum()
+                assert n_bad == 0, f"{name} epochs have {n_bad} non-finite values!"
 
-        self.k = k
-        self.fold = fold
+            if verbose:
+                print(
+                    "Raw epoch uV range:", self.raw_epochs.min(), self.raw_epochs.max()
+                )
 
-        # --- stratified k-fold split --------------------------------------
+            # raw: (N, T_raw, 14)
+            # bp: (N, T_bp, 84)
+            # dwt: (N, 84)
+            # labels: (N,)
+            # subject_ids: (N,)
 
-        if k == 1:
+            print(f"{Colors.OKGREEN}Loaded {len(self.labels)} epochs.{Colors.ENDC}")
+
+        # --- dataset splitting -----------------------------------------------
+
+        if split == "stratified":
             rng = np.random.RandomState(42)
             train_idx, val_idx = [], []
 
+            # 80% train, 20% val, same number of each class in each split
             for cls in range(self.num_classes):
                 cls_idx = np.where(self.labels == cls)[0]
                 rng.shuffle(cls_idx)
@@ -199,32 +188,25 @@ class PhysioNetGestureDataset(Dataset):
             self.train_idx = np.array(sorted(train_idx), dtype=np.int64)
             self.val_idx = np.array(sorted(val_idx), dtype=np.int64)
 
-            print(
-                f"{Colors.OKBLUE}{len(self.train_idx)} train, "
-                f"{len(self.val_idx)} val{Colors.ENDC}"
-            )
-
-        else:
+        elif split == "subject":
+            # 80% train, 20% val, same number of each subject in each split
+            unique_subjects = np.unique(self.subject_ids)
             rng = np.random.RandomState(42)
-            train_idx, val_idx = [], []
-            for cls in range(self.num_classes):
-                cls_idx = np.where(self.labels == cls)[0]
-                rng.shuffle(cls_idx)
-                cls_folds = np.array_split(cls_idx, k)
-                val_idx.extend(cls_folds[fold])
-                train_idx.extend(
-                    np.concatenate([f for i, f in enumerate(cls_folds) if i != fold])
-                )
+            rng.shuffle(unique_subjects)
 
-            self.train_idx = np.array(sorted(train_idx), dtype=np.int64)
-            self.val_idx = np.array(sorted(val_idx), dtype=np.int64)
+            split_idx = round(len(unique_subjects) * 0.8)
+            train_subjects = unique_subjects[:split_idx]
+            val_subjects = unique_subjects[split_idx:]
 
-            print(
-                f"{Colors.OKBLUE}Fold {fold + 1}/{k}: {len(self.train_idx)} train, "
-                f"{len(self.val_idx)} val{Colors.ENDC}"
-            )
+            self.train_idx = np.where(np.isin(self.subject_ids, train_subjects))[0]
+            self.val_idx = np.where(np.isin(self.subject_ids, val_subjects))[0]
 
-        # --- CSP spatial-filter features -------------------------------
+        print(
+            f"{Colors.OKBLUE}{len(self.train_idx)} train, "
+            f"{len(self.val_idx)} val{Colors.ENDC}"
+        )
+
+        # --- CSP spatial-filter features -------------------------------------
 
         csp_input = self.raw_epochs.transpose(0, 2, 1).astype(np.float64)
 
@@ -238,6 +220,16 @@ class PhysioNetGestureDataset(Dataset):
         n_bad = (~np.isfinite(self.csp_epochs)).sum()
         assert n_bad == 0, f"CSP epochs have {n_bad} non-finite values!"
         print("CSP epoch uV range:", self.csp_epochs.min(), self.csp_epochs.max())
+
+        if verbose:
+            print(Colors.HEADER)
+            print("Raw epochs shape:        ", self.raw_epochs.shape)
+            print("Bandpower epochs shape:  ", self.bp_epochs.shape)
+            print("DWT epochs shape:        ", self.dwt_epochs.shape)
+            print("CSP epochs shape:        ", self.csp_epochs.shape)
+            print("Labels shape:            ", self.labels.shape)
+            print("Subject IDs shape:       ", self.subject_ids.shape)
+            print(Colors.ENDC)
 
     def epoch_recording(
         self,
@@ -257,6 +249,10 @@ class PhysioNetGestureDataset(Dataset):
         """
         raw = mne.io.read_raw_edf(path, preload=True, verbose=False)
 
+        if raw.info["sfreq"] != 160:
+            print(f"Skipping {path.name}: sfreq={raw.info['sfreq']}")
+            return np.array([]), np.array([]), np.array([]), np.array([])
+
         raw.rename_channels(lambda name: name.rstrip(".").upper())
         sfreq = raw.info["sfreq"]
 
@@ -267,10 +263,12 @@ class PhysioNetGestureDataset(Dataset):
             if name in event_ids
         }
 
+        raw._data *= 1e6  # volts -> uV
+
         raw.filter(l_freq=0.1, h_freq=50, verbose=False)
         raw.notch_filter(freqs=60, verbose=False)
 
-        # --- ICA artifact removal ------------------------------------
+        # --- ICA artifact removal --------------------------------------------
 
         ica_raw = raw.copy().filter(l_freq=1.0, h_freq=None, verbose=False)
 
@@ -281,8 +279,6 @@ class PhysioNetGestureDataset(Dataset):
             max_iter="auto",
             verbose=False,
         )
-
-        data = ica_raw.get_data()
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", RuntimeWarning)
@@ -298,8 +294,6 @@ class PhysioNetGestureDataset(Dataset):
         raw.set_eeg_reference("average", projection=False, verbose=False)
 
         filtered: NDArray = raw.get_data().T  # (T, num_channels)
-
-        filtered = filtered * 1e6  # volts -> microvolts
 
         bp_features = compute_bandpower_features(
             filtered,
@@ -318,7 +312,7 @@ class PhysioNetGestureDataset(Dataset):
             bp_offset + np.arange(len(bp_features)) / bp_rate
         )  # time of each bandpower timestep relative to the start of the raw signal
 
-        # --- slice one epoch per T1/T2 movement annotation ------------------
+        # --- slice one epoch per T1/T2 movement annotation -------------------
 
         t_raw = round(
             self.motor_exec_sec * sfreq
@@ -355,7 +349,7 @@ class PhysioNetGestureDataset(Dataset):
 
             raw_epoch = filtered[onset_raw : onset_raw + t_raw]
 
-            # --- DWT feature extraction, one call per epoch ------------
+            # --- DWT feature extraction, one call per epoch ------------------
 
             dwt_epoch = compute_dwt_features(raw_epoch)
 
@@ -363,6 +357,9 @@ class PhysioNetGestureDataset(Dataset):
             dwt_epochs.append(dwt_epoch)
             bp_epochs.append(bp_features[onset_bp : onset_bp + t_bp])
             labels.append(cls)
+
+        if not labels:
+            return np.array([]), np.array([]), np.array([]), np.array([])
 
         return (
             np.stack(raw_epochs),
