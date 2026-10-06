@@ -8,7 +8,7 @@ import torch
 from numpy.typing import NDArray
 from torch.utils.data import Dataset
 
-from .utils import (
+from ..utils import (
     Colors,
     compute_bandpower_features,
     compute_dwt_features,

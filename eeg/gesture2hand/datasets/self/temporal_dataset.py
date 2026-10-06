@@ -10,7 +10,7 @@ from eeg.big_hand.position_llm import RegionTokenizer
 from eeg.big_hand.position_llm.vqvae import VQVAE
 from eeg.data_collection import JointData
 
-from .utils import Colors, appendages, compute_bandpower_features
+from ..utils import Colors, appendages, compute_bandpower_features
 
 
 class TemporalDataset(Dataset):
@@ -347,7 +347,7 @@ class TemporalDataset(Dataset):
         return len(self.bp_chunks_split)
 
     def __getitem__(
-        self, index: int | float
+        self, index: float
     ) -> tuple[
         torch.Tensor,
         torch.Tensor,

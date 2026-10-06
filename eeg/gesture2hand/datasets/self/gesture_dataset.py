@@ -9,8 +9,8 @@ import torch
 from numpy.typing import NDArray
 from torch.utils.data import Dataset
 
-from ..utils import gesture_experiments
-from .utils import (
+from ...utils import gesture_experiments
+from ..utils import (
     EMOTIV_CHANNELS,
     Colors,
     compute_bandpower_features,
