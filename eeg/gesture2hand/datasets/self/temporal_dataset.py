@@ -4,13 +4,8 @@ import mne
 import numpy as np
 import torch
 from torch.utils.data import Dataset
-from tqdm import tqdm
 
-from eeg.big_hand.position_llm import RegionTokenizer
-from eeg.big_hand.position_llm.vqvae import VQVAE
-from eeg.data_collection import JointData
-
-from ..utils import Colors, appendages, compute_bandpower_features
+from ..utils import Colors, compute_bandpower_features
 
 
 class TemporalDataset(Dataset):
@@ -18,13 +13,10 @@ class TemporalDataset(Dataset):
         self,
         eeg_data_path: str = "/var/log/thavamount/eeg_dataset/home_eeg",
         hand_data_path: str = "/var/log/thavamount/eeg_dataset/hand_data",
-        vqvae_path: str = "/var/log/thavamount/eeg_ckpts/eeg_vqvae/vqvae_final_1250.pth",
-        region_tokenizer_path: str = "models/appendages",
         seq_len: int = 60,
         stride: int = 15,
         device: str = "cpu",
         mode: str = "train",
-        data_mode: str = "bp",
         val_ratio: float = 0.2,
         train_fraction: float = 1.0,
         verbose: bool = False,
@@ -39,20 +31,8 @@ class TemporalDataset(Dataset):
         self.seq_len = seq_len
         self.stride = stride
         self.device = device
-        self.data_mode = data_mode
 
         super().__init__()
-
-        # --- vqvae -----------------------------------------------------------
-
-        print(f"{Colors.OKBLUE}Getting VQVAE model...{Colors.ENDC}")
-        self.vqvae = VQVAE(input_dim=12, codebook_size=512, embedding_dim=1024)
-        vqvae_state_dict = torch.load(vqvae_path, map_location=device)
-        self.vqvae.load_state_dict(vqvae_state_dict["model"])
-        self.vqvae.to(device)
-        self.vqvae.eval()
-
-        self.region_tokenizer = RegionTokenizer(region_tokenizer_path)
 
         # --- EEG -------------------------------------------------------------
 
@@ -143,19 +123,6 @@ class TemporalDataset(Dataset):
 
         self.labels = (np.concatenate(self.label_files, axis=0) - 1).astype(np.int64)
 
-        # --- appendages + regions --------------------------------------------
-
-        print(f"{Colors.OKBLUE}Getting appendage data...{Colors.ENDC}")
-        self.hands = []
-        for path in sorted(Path(f"{hand_data_path}").rglob("*hands_cut.npy")):
-            self.hands.append(np.load(path))
-
-        self.raw_app_data = np.concatenate(self.hands, axis=1)  # along time dim
-        self.data_joints = JointData(self.raw_app_data)
-        self.app_data = appendages(self.data_joints)  # (T, 12)
-        self.app_data = np.array(self.region_tokenizer.scaler.transform(self.app_data))
-
-        print(f"{Colors.OKGREEN}Retrieved appendage data.{Colors.ENDC}")
         print(f"{Colors.OKGREEN}Successful retrieved all data.{Colors.ENDC}")
 
         # --- align bandpower to 30 Hz time grid (interpolation) --------------
@@ -167,7 +134,7 @@ class TemporalDataset(Dataset):
         bp_times = bp_offset + np.arange(len(self.bandpower_features_raw)) / bp_rate
 
         target_sfreq = filtered_30.info["sfreq"]
-        target_len = min(len(self.eeg_data), len(self.app_data), len(self.labels))
+        target_len = min(len(self.eeg_data), len(self.labels))
         target_times = np.arange(target_len) / target_sfreq
 
         valid = target_times <= bp_times[-1]
@@ -184,7 +151,6 @@ class TemporalDataset(Dataset):
 
         self.bandpower_features = bp_aligned
         self.eeg_data = self.eeg_data[:target_len]
-        self.app_data = self.app_data[:target_len]
         self.labels = self.labels[:target_len]
         min_len = target_len
 
@@ -193,52 +159,32 @@ class TemporalDataset(Dataset):
             f"{min_len} samples{Colors.ENDC}"
         )
 
-        # - vq-vae pre-computing -
-        print(f"{Colors.OKBLUE}Pre-computing VQ-VAE tokens...{Colors.ENDC}")
-        self.vqvae_tokens_all = []
-        chunk_size = 2048
-        with torch.no_grad():
-            for i in tqdm(range(0, len(self.app_data), chunk_size)):
-                chunk = self.app_data[i : i + chunk_size, :]
-                chunk_tensor = (
-                    torch.tensor(chunk, dtype=torch.float32).to(device).unsqueeze(0)
-                )
-                tokens = self.vqvae.encode(chunk_tensor)
-                self.vqvae_tokens_all.append(tokens.cpu().numpy().flatten())
-        self.vqvae_tokens_all = np.concatenate(self.vqvae_tokens_all)
-
         if verbose:
             print(Colors.HEADER)
             print("EEG shape (30Hz):   ", self.eeg_data.shape)
             print("Bandpower shape:    ", self.bandpower_features.shape)
-            print("Appendages shape:   ", self.app_data.shape)
-            print("VQ-VAE tokens shape:", self.vqvae_tokens_all.shape)
             print("Labels shape:       ", self.labels.shape)
             print(Colors.ENDC)
 
         # --- sequences -------------------------------------------------------
 
-        all_eeg, all_bp, all_app, all_tokens, all_labels = [], [], [], [], []
+        all_eeg, all_bp, all_labels = [], [], []
 
         # we iterate over the data in steps of stride, creating chunks of length
         # seq_len. for each chunk, we extract the corresponding segments of
-        # eeg_data, bandpower_features, app_data, vqvae_tokens_all, and labels,
-        # and store them in lists. this way we create overlapping sequences of
-        # data that can be used for training a temporal model. the resulting
-        # chunks will have shape (num_chunks, seq_len, feature_dim) for eeg,
-        # bandpower, and appendage data, and (num_chunks, seq_len) for tokens
-        # and labels
+        # eeg_data, bandpower_features, and labels, and store them in lists.
+        # this way we create overlapping sequences of data that can be used
+        # for training a temporal model. the resulting chunks will have shape
+        # num_chunks, seq_len, feature_dim for eeg, bandpower, and appendage
+        # data, and (num_chunks, seq_len) for tokens and labels
+
         for i in range(0, min_len - seq_len + 1, stride):
             all_eeg.append(self.eeg_data[i : i + seq_len, :])
             all_bp.append(self.bandpower_features[i : i + seq_len, :])
-            all_app.append(self.app_data[i : i + seq_len, :])
-            all_tokens.append(self.vqvae_tokens_all[i : i + seq_len])
             all_labels.append(self.labels[i : i + seq_len])
 
         self.eeg_chunks = np.array(all_eeg, dtype=np.float32)
         self.bp_chunks = np.array(all_bp, dtype=np.float32)
-        self.app_chunks = np.array(all_app, dtype=np.float32)
-        self.token_chunks = np.array(all_tokens, dtype=np.int64)
         self.label_chunks = np.array(all_labels, dtype=np.int64)
 
         # --- train-val split (large contiguous blocks, no leakage) ----------
@@ -330,8 +276,6 @@ class TemporalDataset(Dataset):
 
         self.eeg_chunks_split = self.eeg_chunks[split_idx]
         self.bp_chunks_split = self.bp_chunks[split_idx]
-        self.app_chunks_split = self.app_chunks[split_idx]
-        self.token_chunks_split = self.token_chunks[split_idx]
         self.label_chunks_split = self.label_chunks[split_idx]
 
         if verbose:
@@ -347,66 +291,25 @@ class TemporalDataset(Dataset):
         return len(self.bp_chunks_split)
 
     def __getitem__(
-        self, index: float
-    ) -> tuple[
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-    ]:
+        self, index: int
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
-        Returns EEG, bandpower, appendage data, VQ-VAE tokens, labels, durations, and
-        masks for the given index from the training set.
+        Returns EEG, bandpower features, and the chunk label for the given index.
         """
-
-        # ensure index is a plain integer for numpy
         if torch.is_tensor(index):
-            index = index.item()
+            index = int(index.item())
         index = int(index)
 
         eeg = self.eeg_chunks_split[index]
         bp = self.bp_chunks_split[index]
-        apps = self.app_chunks_split[index]
-        tokens = self.token_chunks_split[index]
         labels = self.label_chunks_split[index]
 
         chunk_label = np.bincount(labels).argmax()
 
-        # vqvae_tokens: (T,)
-        reversed_tokens = tokens[::-1]
-        durations = [1]
-        for i in range(1, len(reversed_tokens)):
-            current_tok = reversed_tokens[i]
-            prev_tok = reversed_tokens[i - 1]
-
-            if prev_tok == current_tok:
-                durations.append(durations[-1] + 1)
-            else:
-                durations.append(1)
-
-        durations = durations[::-1]
-
-        masks: list[int | float] = [1]
-        for i in range(len(tokens) - 1):
-            current_tok = tokens[i]
-            next_tok = tokens[i + 1]
-
-            if next_tok == current_tok:
-                masks.append(1e-4)
-            else:
-                masks.append(1)
-
         return (
             torch.tensor(eeg),
             torch.tensor(bp),
-            torch.tensor(apps),
-            torch.tensor(tokens),
             torch.tensor(chunk_label),
-            torch.tensor(durations),
-            torch.tensor(masks),
         )
 
     def get_sampler_weights(self) -> tuple[list[float], torch.Tensor]:

@@ -2,6 +2,7 @@ from .datasets import GestureDataset, PhysioNetGestureDataset, TemporalDataset
 from .datasets.utils import Colors
 from .models import (
     EEGLinearBaseline,
+    EEGNet,
     GestureModel,
     GestureTemporalModel,
     TemporalModel,

@@ -266,7 +266,7 @@ class PhysioNetGestureDataset(Dataset):
 
         raw._data *= 1e6  # volts -> uV
 
-        raw.filter(l_freq=0.1, h_freq=50, verbose=False)
+        raw.filter(l_freq=4, h_freq=50, verbose=False)
         raw.notch_filter(freqs=60, verbose=False)
 
         # --- ICA artifact removal --------------------------------------------
