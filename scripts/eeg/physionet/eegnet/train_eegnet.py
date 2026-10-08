@@ -1,13 +1,7 @@
 """
-For the Physionet EEG Motor Movement/Imagery Dataset.
-
-Trains GestureModel (transformer encoder + decoder-query architecture) to
-predict a gesture class from one EEG epoch (raw channels, bandpower, CSP, or
-DWT features). train(input_type, fold) trains one model on one k-fold split and
-returns its val accuracy.
+Trains EEGNet (see model class file) with series of convolutions in order to
+classify a class out of 4 classes from EEG data.
 """
-
-import math
 
 import torch
 import yaml
@@ -16,26 +10,17 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 import wandb
-from eeg.gesture2hand import GestureModel, PhysioNetGestureDataset
+from eeg.gesture2hand import EEGNet, PhysioNetGestureDataset, load_physionet_data
 
-with open("config/gesture_model.yaml", "r") as config_file:
+with open("config/eegnet.yaml", "r") as config_file:
     config = yaml.safe_load(config_file)
 
     experiment = config["experiment"]
     input_type = config["input_type"]
 
-    num_layers = config["num_layers"]
-    decoder_num_layers = config["decoder_num_layers"]
-    num_heads = config["num_heads"]
-    embedding_dim = config["embedding_dim"]
-    ffn_hidden_dim = config["ffn_hidden_dim"]
-    encoder_dropout = config["encoder_dropout"]
-    decoder_dropout = config["decoder_dropout"]
-
-    num_recordings = config["num_recordings"]
+    num_epochs = config["num_epochs"]
     device = config["device"]
     batch_size = config["batch_size"]
-    warmup_steps = config["warmup_steps"]
     base_lr = float(config["base_lr"])
     epochs = config["epochs"]
 
@@ -137,22 +122,21 @@ def train(input_type: str, print_confusion_matrix: bool) -> float:
     Returns the final val accuracy.
     """
 
-    run_name = f"gesture_model_{experiment}_{input_type}"
+    run_name = f"eegnet_{experiment}_{input_type}"
 
     print("\n=======================================")
     print(f"STARTING TRAINING FOR RUN: {run_name} FOR {epochs} EPOCHS")
     print("=======================================")
 
     # --- data ---
-
-    dataset = PhysioNetGestureDataset(
+    data = load_physionet_data(
         split="subject",
+        num_epochs=num_epochs,
         load_from_saved=True,
         verbose=True,
     )
-
-    train_dataset = dataset.get_split("train")
-    val_dataset = dataset.get_split("val")
+    train_dataset = PhysioNetGestureDataset(data, mode="train")
+    val_dataset = PhysioNetGestureDataset(data, mode="val")
 
     sample_weights, _ = train_dataset.get_sampler_weights()
     sampler = torch.utils.data.WeightedRandomSampler(
@@ -168,17 +152,7 @@ def train(input_type: str, print_confusion_matrix: bool) -> float:
 
     num_features = num_features_by_input_type[input_type]
 
-    model = GestureModel(
-        num_features=num_features,
-        num_classes=train_dataset.num_classes,
-        num_layers=num_layers,
-        decoder_num_layers=decoder_num_layers,
-        num_heads=num_heads,
-        embedding_dim=embedding_dim,
-        ffn_hidden_dim=ffn_hidden_dim,
-        encoder_dropout=encoder_dropout,
-        decoder_dropout=decoder_dropout,
-    ).to(device)
+    model = EEGNet().to(device)
 
     param_count = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"Number of model parameters: {param_count:,}")
@@ -186,16 +160,7 @@ def train(input_type: str, print_confusion_matrix: bool) -> float:
     # --- optimizer ---
 
     loss_fn = nn.CrossEntropyLoss()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=base_lr, weight_decay=0.01)
-
-    def warmup_cosine_lr(step: int) -> float:
-        if step < warmup_steps:
-            return step / warmup_steps
-        total_steps = epochs * len(train_loader)
-        progress = (step - warmup_steps) / max(total_steps - warmup_steps, 1)
-        return 0.5 * (1.0 + math.cos(math.pi * progress))
-
-    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, warmup_cosine_lr)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=base_lr)
 
     if use_ckpt_path is not None:
         checkpoint = torch.load(use_ckpt_path, map_location=device)
@@ -211,8 +176,8 @@ def train(input_type: str, print_confusion_matrix: bool) -> float:
         project="eeg",
         config={
             "learning_rate": base_lr,
-            "architecture": "GestureModel",
-            "dataset": "gesture_dataset",
+            "architecture": "EEGNet",
+            "dataset": "physionet",
             "experiment": experiment,
             "input_type": input_type,
             "epochs": epochs,
@@ -237,6 +202,8 @@ def train(input_type: str, print_confusion_matrix: bool) -> float:
             )  # (B, T, C)
             labels = labels.to(device)
 
+            features = features.transpose(1, 2).unsqueeze(1)  # (B, 1, C, T)
+
             label_logits = model(features)  # out: (B, num_classes)
             loss = loss_fn(label_logits, labels)
             epoch_train_loss += loss.item()
@@ -245,7 +212,6 @@ def train(input_type: str, print_confusion_matrix: bool) -> float:
             optimizer.zero_grad()  # optimizer has access to all model params, grads -> 0
             loss.backward()  # calculates and adds gradients to params so optim sees
             optimizer.step()  # optim looks at gradients and steps accordingly
-            scheduler.step()  # steps lr
 
         val_loss, val_acc, val_f1, confusion_matrix = validate(
             model, val_loader, loss_fn, input_type, train_dataset.num_classes

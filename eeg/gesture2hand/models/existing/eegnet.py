@@ -14,7 +14,7 @@ class EEGNet(nn.Module):
         self,
         vocab_size: int = 4,
         num_channels: int = 64,
-        num_samples: int = 400,
+        num_samples: int = 160,
         dropout: float = 0.5,
         kern_length: int = 64,
         f1: int = 8,
@@ -84,14 +84,24 @@ class EEGNet(nn.Module):
         convolutions to process EEG data.
         """
 
+        print(x.shape)
+
         # --- block 1 ---
         x = self.conv2d(x)
+        print(x.shape)
         x = self.batch_norm1(x)
+        print(x.shape)
         x = self.depthwise_conv2d(x)
+        print(x.shape)
         x = self.batch_norm2(x)
+        print(x.shape)
         x = self.elu(x)
+        print(x.shape)
         x = self.avg_pool1(x)
+        print(x.shape)
         x = self.dropout(x)
+
+        print(x.shape)
 
         # --- block 2 ---
         x = self.separable_conv2d(x)
@@ -100,7 +110,12 @@ class EEGNet(nn.Module):
         x = self.avg_pool2(x)
         x = self.dropout(x)
 
+        print(x.shape)
+
         x = x.flatten(start_dim=1)
+
+        print(x.shape)
+        quit()
 
         # --- classifier ---
         x = self.vocab_projection(x)

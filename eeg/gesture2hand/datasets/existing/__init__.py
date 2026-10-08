@@ -1,1 +1,1 @@
-from .physio_net_gesture_dataset import PhysioNetGestureDataset
+from .physio_net_gesture_dataset import PhysioNetGestureDataset, load_physionet_data
