@@ -66,14 +66,6 @@ def load_physionet_data(
         labels = np.load(Path(save_path) / "labels.npy")
         subject_ids = np.load(Path(save_path) / "subject_ids.npy")
 
-        if num_epochs != -1:
-            raw_epochs = raw_epochs[:num_epochs]
-            bp_epochs = bp_epochs[:num_epochs]
-            dwt_epochs = dwt_epochs[:num_epochs]
-            csp_epochs = csp_epochs[:num_epochs]
-            labels = labels[:num_epochs]
-            subject_ids = subject_ids[:num_epochs]
-
         print(
             f"{Colors.OKGREEN}Loaded {len(labels)} epochs from {save_path}{Colors.ENDC}"
         )
@@ -175,6 +167,9 @@ def load_physionet_data(
 
         train_idx = np.where(np.isin(subject_ids, train_subjects))[0]
         val_idx = np.where(np.isin(subject_ids, val_subjects))[0]
+
+    if num_epochs != -1:
+        train_idx = train_idx[:num_epochs]
 
     print(f"{Colors.OKBLUE}{len(train_idx)} train, {len(val_idx)} val{Colors.ENDC}")
 

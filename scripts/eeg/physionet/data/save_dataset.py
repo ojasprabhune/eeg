@@ -2,9 +2,10 @@ from pathlib import Path
 
 import numpy as np
 
-from eeg.gesture2hand import PhysioNetGestureDataset
+from eeg.gesture2hand import PhysioNetGestureDataset, load_physionet_data
 
-dataset = PhysioNetGestureDataset(split="subject", load_from_saved=False, verbose=True)
+data = load_physionet_data(load_from_saved=False)
+dataset = PhysioNetGestureDataset(data)
 
 save_path = Path("~/Documents/research/NORA/recordings/physio_net/dataset").expanduser()
 save_path.mkdir(parents=True, exist_ok=True)

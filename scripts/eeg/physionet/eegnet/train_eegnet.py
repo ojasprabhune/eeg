@@ -95,6 +95,8 @@ def validate(
             features = select_input(raw, bp, csp, dwt, input_type).to(device)
             labels = labels.to(device)
 
+            features = features.transpose(1, 2).unsqueeze(1)  # (B, 1, C, T)
+
             logits = model(features)
             loss = loss_fn(logits, labels)
 
