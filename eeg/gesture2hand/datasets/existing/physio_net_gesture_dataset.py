@@ -28,6 +28,7 @@ def load_physionet_data(
     epoch_start_sec: float = 0.0,
     bp_window_sec: float = 1.0,
     bp_step_samples: int = 4,
+    skip_preprocessing: bool = False,
     verbose: bool = False,
 ) -> dict:
     """
@@ -36,6 +37,8 @@ def load_physionet_data(
 
     If load_from_saved is False, reprocess the EDF files instead. The returned
     arrays can then be saved by save_dataset.py; this function does not save them.
+    If skip_preprocessing is True, the bandpass, notch, ICA and average
+    reference are skipped (uV scaling is still applied).
     If num_recordings is -1, all imagined-movement and baseline recordings are used.
     """
     print(f"{Colors.HEADER}{Colors.BOLD}Initializing gesture dataset...{Colors.ENDC}")
@@ -93,6 +96,7 @@ def load_physionet_data(
                 epoch_start_sec=epoch_start_sec,
                 bp_window_sec=bp_window_sec,
                 bp_step_samples=bp_step_samples,
+                skip_preprocessing=skip_preprocessing,
             )
             raw_epochs.extend(recording_epochs[0])
             bp_epochs.extend(recording_epochs[1])
@@ -227,6 +231,7 @@ def _epoch_recording(
     epoch_start_sec: float,
     bp_window_sec: float,
     bp_step_samples: int,
+    skip_preprocessing: bool = False,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Loads one EDF run and slices out fixed-length movement epochs.
@@ -250,33 +255,34 @@ def _epoch_recording(
 
     raw._data *= 1e6  # volts -> uV
 
-    raw.filter(l_freq=4, h_freq=50, verbose=False)
-    raw.notch_filter(freqs=60, verbose=False)
+    if not skip_preprocessing:
+        raw.filter(l_freq=4, h_freq=50, verbose=False)
+        raw.notch_filter(freqs=60, verbose=False)
 
-    # --- ICA artifact removal --------------------------------------------
+        # --- ICA artifact removal --------------------------------------------
 
-    ica_raw = raw.copy().filter(l_freq=1.0, h_freq=None, verbose=False)
+        ica_raw = raw.copy().filter(l_freq=1.0, h_freq=None, verbose=False)
 
-    ica = mne.preprocessing.ICA(
-        n_components=20,
-        method="picard",
-        random_state=42,
-        max_iter="auto",
-        verbose=False,
-    )
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", RuntimeWarning)
-
-        ica.fit(ica_raw, verbose=False)
-
-        eog_component_idx, _ = ica.find_bads_eog(
-            ica_raw, ch_name=["FP1", "FP2"], verbose=False
+        ica = mne.preprocessing.ICA(
+            n_components=20,
+            method="picard",
+            random_state=42,
+            max_iter="auto",
+            verbose=False,
         )
-        ica.exclude = eog_component_idx
-        raw = ica.apply(raw, verbose=False)
 
-    raw.set_eeg_reference("average", projection=False, verbose=False)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+
+            ica.fit(ica_raw, verbose=False)
+
+            eog_component_idx, _ = ica.find_bads_eog(
+                ica_raw, ch_name=["FP1", "FP2"], verbose=False
+            )
+            ica.exclude = eog_component_idx
+            raw = ica.apply(raw, verbose=False)
+
+        raw.set_eeg_reference("average", projection=False, verbose=False)
 
     filtered: NDArray = raw.get_data().T  # (T, num_channels)
 
