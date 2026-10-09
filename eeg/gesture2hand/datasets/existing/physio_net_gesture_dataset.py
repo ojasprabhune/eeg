@@ -24,8 +24,8 @@ def load_physionet_data(
     num_recordings: int = -1,
     num_epochs: int = -1,
     load_from_saved: bool = True,
-    motor_exec_sec: float = 2.5,
-    epoch_start_sec: float = 0.5,
+    motor_exec_sec: float = 3,
+    epoch_start_sec: float = 0.0,
     bp_window_sec: float = 1.0,
     bp_step_samples: int = 4,
     verbose: bool = False,
@@ -36,21 +36,23 @@ def load_physionet_data(
 
     If load_from_saved is False, reprocess the EDF files instead. The returned
     arrays can then be saved by save_dataset.py; this function does not save them.
-    If num_recordings is -1, all executed-movement recordings are used.
+    If num_recordings is -1, all imagined-movement and baseline recordings are used.
     """
     print(f"{Colors.HEADER}{Colors.BOLD}Initializing gesture dataset...{Colors.ENDC}")
-    num_classes = 4  # left fist, right fist, both fists, both feet
+    num_classes = 4  # imagined left fist, imagined right fist, rest, imagined both feet
 
     # --- load + epoch executed runs --------------------------------------
 
-    # labels: left fist, right fist, both fists, both feet
+    # matches the label scheme of get_data.py in the official repo of
+    # arXiv:2004.00077 (runs 1/4/6/8/10/12/14, both-fists imagery discarded)
     run_labels = {
-        "03": {"T1": 0, "T2": 1},
-        "07": {"T1": 0, "T2": 1},
-        "11": {"T1": 0, "T2": 1},
-        "05": {"T1": 2, "T2": 3},
-        "09": {"T1": 2, "T2": 3},
-        "13": {"T1": 2, "T2": 3},
+        "01": "rest",  # baseline eyes-open run: sliced into windows, no annotations
+        "04": {"T1": 0, "T2": 1},
+        "08": {"T1": 0, "T2": 1},
+        "12": {"T1": 0, "T2": 1},
+        "06": {"T2": 3},  # T1 (both fists) discarded
+        "10": {"T2": 3},
+        "14": {"T2": 3},
     }
 
     # path.stem is the filename without the .edf extension, so
@@ -138,7 +140,20 @@ def load_physionet_data(
 
     # --- dataset splitting -----------------------------------------------
 
-    if split == "stratified":
+    if split == "subject":
+        # 80% train, 20% val, same number of each subject in each split
+        unique_subjects = np.unique(subject_ids)
+        rng = np.random.RandomState(42)
+        rng.shuffle(unique_subjects)
+
+        split_idx = round(len(unique_subjects) * 0.8)
+        train_subjects = unique_subjects[:split_idx]
+        val_subjects = unique_subjects[split_idx:]
+
+        train_idx = np.where(np.isin(subject_ids, train_subjects))[0]
+        val_idx = np.where(np.isin(subject_ids, val_subjects))[0]
+
+    else:
         rng = np.random.RandomState(42)
         train_idx, val_idx = [], []
 
@@ -154,19 +169,6 @@ def load_physionet_data(
 
         train_idx = np.array(sorted(train_idx), dtype=np.int64)
         val_idx = np.array(sorted(val_idx), dtype=np.int64)
-
-    elif split == "subject":
-        # 80% train, 20% val, same number of each subject in each split
-        unique_subjects = np.unique(subject_ids)
-        rng = np.random.RandomState(42)
-        rng.shuffle(unique_subjects)
-
-        split_idx = round(len(unique_subjects) * 0.8)
-        train_subjects = unique_subjects[:split_idx]
-        val_subjects = unique_subjects[split_idx:]
-
-        train_idx = np.where(np.isin(subject_ids, train_subjects))[0]
-        val_idx = np.where(np.isin(subject_ids, val_subjects))[0]
 
     if num_epochs != -1:
         train_idx = train_idx[:num_epochs]
@@ -220,7 +222,7 @@ def load_physionet_data(
 
 def _epoch_recording(
     path: Path,
-    run_labels: dict[str, int],
+    run_labels: dict[str, int] | str,
     motor_exec_sec: float,
     epoch_start_sec: float,
     bp_window_sec: float,
@@ -245,11 +247,6 @@ def _epoch_recording(
     sfreq = raw.info["sfreq"]
 
     events, event_ids = mne.events_from_annotations(raw, verbose=False)
-    event_codes = {
-        event_ids[name]: label
-        for name, label in run_labels.items()
-        if name in event_ids
-    }
 
     raw._data *= 1e6  # volts -> uV
 
@@ -300,16 +297,57 @@ def _epoch_recording(
         bp_offset + np.arange(len(bp_features)) / bp_rate
     )  # time of each bandpower timestep relative to the start of the raw signal
 
-    # --- slice one epoch per T1/T2 movement annotation -------------------
-
     t_raw = round(motor_exec_sec * sfreq)  # number of raw samples in a 3s epoch
     t_bp = (
         round((motor_exec_sec - bp_window_sec) * bp_rate) + 1
     )  # number of bandpower timesteps in a 3s epoch
 
+    # --- baseline run: slice rest epochs straight from the signal --------
+    # run 01 is 60s of eyes-open rest with no task annotations, so slice
+    # non-overlapping windows instead of reading T1/T2 markers
+    if run_labels == "rest":
+        raw_epochs, bp_epochs, dwt_epochs, labels = [], [], [], []
+
+        # cap at 21 windows so rest has the same trial count as the task
+        # classes (7 trials x 3 runs); at 2.5s, 60s fits 24
+        n_windows = min(len(filtered) // t_raw, 21)
+        for w in range(n_windows):
+            onset_raw = w * t_raw
+            onset_bp = int(np.searchsorted(bp_times, onset_raw / sfreq))
+
+            if onset_bp + t_bp > len(bp_features):
+                continue
+
+            raw_epoch = filtered[onset_raw : onset_raw + t_raw]
+            raw_epochs.append(raw_epoch)
+            dwt_epochs.append(compute_dwt_features(raw_epoch))
+            bp_epochs.append(bp_features[onset_bp : onset_bp + t_bp])
+            labels.append(2)  # rest
+
+        if not labels:
+            return np.array([]), np.array([]), np.array([]), np.array([])
+
+        return (
+            np.stack(raw_epochs),
+            np.stack(bp_epochs),
+            np.stack(dwt_epochs),
+            np.array(labels),
+        )
+
+    # --- slice one epoch per T1/T2 movement annotation -------------------
+
     raw_epochs, bp_epochs, dwt_epochs, labels = [], [], [], []
 
     for i, event in enumerate(events):
+        # since we are not rest, run_labels should be a dict of T1/T2 labels
+        assert isinstance(run_labels, dict)
+
+        event_codes = {
+            event_ids[name]: label
+            for name, label in run_labels.items()
+            if name in event_ids
+        }
+
         # check that this event is a T1/T2 movement annotation, not a rest period
         if event[2] not in event_codes:
             continue
@@ -346,9 +384,6 @@ def _epoch_recording(
         bp_epochs.append(bp_features[onset_bp : onset_bp + t_bp])
         labels.append(cls)
 
-    if not labels:
-        return np.array([]), np.array([]), np.array([]), np.array([])
-
     return (
         np.stack(raw_epochs),
         np.stack(bp_epochs),
@@ -360,9 +395,9 @@ def _epoch_recording(
 class PhysioNetGestureDataset(Dataset):
     """
     This dataset loads the PhysioNet EEG Motor Movement/Imagery Dataset and its
-    EEGMMIDB EDF recordings and extracts executed-movement epochs from the
-    T1/T2 annotations. T1/T2 labels depend on the run: unilateral runs are
-    left/right fist, and bilateral runs are both fists/both feet.
+    EEGMMIDB EDF recordings and extracts imagined-movement and baseline epochs
+    from the T1/T2 annotations. T1/T2 labels depend on the run: unilateral runs
+    are left/right fist, and bilateral runs are both fists/both feet.
 
     The gestures thus only apply to the 4 class experiments, where the classes
     are left fist, right fist, both fists, and both feet.
@@ -396,7 +431,7 @@ class PhysioNetGestureDataset(Dataset):
     def epoch_recording(
         self,
         path: Path,
-        run_labels: dict[str, int],
+        run_labels: dict[str, int] | str,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         return _epoch_recording(
             path,

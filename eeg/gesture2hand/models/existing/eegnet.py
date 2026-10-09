@@ -15,7 +15,7 @@ class EEGNet(nn.Module):
         vocab_size: int = 4,
         num_channels: int = 64,
         num_samples: int = 400,
-        dropout: float = 0.5,
+        dropout: float = 0.25,
         kern_length: int = 64,
         f1: int = 8,
         f2: int = 16,
@@ -47,10 +47,10 @@ class EEGNet(nn.Module):
         self.elu = nn.ELU()
 
         self.avg_pool1 = nn.AvgPool2d(
-            kernel_size=(1, 4),
+            kernel_size=(1, 8),
         )
 
-        self.dropout = nn.Dropout2d(dropout)
+        self.dropout = nn.Dropout(dropout)
 
         self.separable_conv2d = nn.Sequential(
             nn.Conv2d(
@@ -70,10 +70,7 @@ class EEGNet(nn.Module):
             kernel_size=(1, 8),
         )
 
-        self.vocab_projection = nn.Linear(
-            in_features=f2 * int(num_samples / 32),
-            out_features=vocab_size,
-        )
+        self.vocab_projection = nn.LazyLinear(out_features=vocab_size)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """

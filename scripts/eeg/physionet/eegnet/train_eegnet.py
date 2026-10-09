@@ -140,21 +140,34 @@ def train(input_type: str, print_confusion_matrix: bool) -> float:
     train_dataset = PhysioNetGestureDataset(data, mode="train")
     val_dataset = PhysioNetGestureDataset(data, mode="val")
 
-    sample_weights, _ = train_dataset.get_sampler_weights()
-    sampler = torch.utils.data.WeightedRandomSampler(
-        weights=sample_weights,
-        num_samples=len(sample_weights),
-        replacement=True,  # important for oversampling minority classes
-    )
-
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, sampler=sampler)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
 
     # --- model ---
 
     num_features = num_features_by_input_type[input_type]
 
-    model = EEGNet().to(device)
+    model = (
+        EEGNet(
+            vocab_size=config["vocab_size"],
+            num_channels=config["num_channels"],
+            num_samples=config["num_samples"],
+            dropout=config["dropout"],
+            kern_length=config["kern_length"],
+            f1=config["f1"],
+            f2=config["f2"],
+            d=config["d"],
+        )
+        .to(device)
+        .eval()
+    )
+
+    raw, bp, csp, dwt, labels = train_dataset[0]
+    features = select_input(raw, bp, csp, dwt, input_type).to(device)  #  (T, C)
+
+    dummy_batch = features.transpose(0, 1).unsqueeze(0).unsqueeze(0)  # (1, 1, C, T)
+    with torch.no_grad():
+        dummy_out = model(dummy_batch)
 
     param_count = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"Number of model parameters: {param_count:,}")
@@ -162,7 +175,7 @@ def train(input_type: str, print_confusion_matrix: bool) -> float:
     # --- optimizer ---
 
     loss_fn = nn.CrossEntropyLoss()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=base_lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=base_lr)
 
     if use_ckpt_path is not None:
         checkpoint = torch.load(use_ckpt_path, map_location=device)

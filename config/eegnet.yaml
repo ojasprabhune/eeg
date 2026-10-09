@@ -6,8 +6,8 @@ input_type: raw # "raw" (14 ch), "bandpower" (84 feat), "csp" (6 feat), or "dwt"
 vocab_size: 4
 num_channels: 64
 num_samples: 400
-dropout: 0.5
-kern_length: 64
+dropout: 0.25
+kern_length: 128
 f1: 8
 f2: 16
 d: 2
