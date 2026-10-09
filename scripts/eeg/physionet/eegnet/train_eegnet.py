@@ -176,6 +176,10 @@ def train(input_type: str, print_confusion_matrix: bool) -> float:
 
     loss_fn = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=base_lr)
+    # paper schedule: 0.01 -> 0.001 at epoch 20 -> 0.0001 at epoch 50
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(
+        optimizer, milestones=[20, 50], gamma=0.1
+    )
 
     if use_ckpt_path is not None:
         checkpoint = torch.load(use_ckpt_path, map_location=device)
@@ -191,6 +195,9 @@ def train(input_type: str, print_confusion_matrix: bool) -> float:
         project="eeg",
         config={
             "learning_rate": base_lr,
+            "base_lr": base_lr,
+            "batch_size": batch_size,
+            "dropout": config["dropout"],
             "architecture": "EEGNet",
             "dataset": "physionet",
             "experiment": experiment,
@@ -210,6 +217,8 @@ def train(input_type: str, print_confusion_matrix: bool) -> float:
 
         epoch_train_loss = 0.0
         n_batches = 0
+        n_correct = 0
+        n_total = 0
 
         for raw, bp, csp, dwt, labels in train_loader:
             features = select_input(raw, bp, csp, dwt, input_type).to(
@@ -223,10 +232,24 @@ def train(input_type: str, print_confusion_matrix: bool) -> float:
             loss = loss_fn(label_logits, labels)
             epoch_train_loss += loss.item()
             n_batches += 1
+            n_correct += (label_logits.argmax(1) == labels).sum().item()
+            n_total += labels.size(0)
 
             optimizer.zero_grad()  # optimizer has access to all model params, grads -> 0
             loss.backward()  # calculates and adds gradients to params so optim sees
             optimizer.step()  # optim looks at gradients and steps accordingly
+
+            # max-norm constraints from the paper (applied after each update)
+            with torch.no_grad():
+                model.depthwise_conv2d.weight.data = torch.renorm(
+                    model.depthwise_conv2d.weight.data.flatten(1),
+                    p=2,
+                    dim=0,
+                    maxnorm=1.0,
+                ).view_as(model.depthwise_conv2d.weight)
+                model.vocab_projection.weight.data = torch.renorm(
+                    model.vocab_projection.weight.data, p=2, dim=0, maxnorm=0.25
+                )
 
         val_loss, val_acc, val_f1, confusion_matrix = validate(
             model, val_loader, loss_fn, input_type, train_dataset.num_classes
@@ -234,12 +257,16 @@ def train(input_type: str, print_confusion_matrix: bool) -> float:
         run.log(
             {
                 "train_loss": epoch_train_loss / n_batches,
+                "train_acc": n_correct / n_total,
+                "lr": optimizer.param_groups[0]["lr"],
                 "val_loss": val_loss,
                 "val_acc": val_acc,
                 "val_f1": val_f1,
                 "epoch": i + 1,
             }
         )
+        scheduler.step()
+
         epoch_tqdm.set_postfix(
             {"val_loss": f"{val_loss:.4f}", "val_acc": f"{val_acc:.3f}"}
         )
