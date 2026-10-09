@@ -71,6 +71,11 @@ def load_physionet_data(
         labels = np.load(Path(save_path) / "labels.npy")
         subject_ids = np.load(Path(save_path) / "subject_ids.npy")
 
+        # sanity check: 3s epochs at 160Hz and the 4 classes
+        assert raw_epochs.shape[1] == 480, raw_epochs.shape
+        assert set(np.unique(labels)) == {0, 1, 2, 3}, np.unique(labels)
+        print("Label counts:", np.bincount(labels))
+
         print(
             f"{Colors.OKGREEN}Loaded {len(labels)} epochs from {save_path}{Colors.ENDC}"
         )
