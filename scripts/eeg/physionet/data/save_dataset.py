@@ -4,7 +4,7 @@ import numpy as np
 
 from eeg.gesture2hand import PhysioNetGestureDataset, load_physionet_data
 
-data = load_physionet_data(load_from_saved=False)
+data = load_physionet_data(load_from_saved=False, skip_preprocessing=True)
 dataset = PhysioNetGestureDataset(data)
 
 save_path = Path("~/Documents/research/NORA/recordings/physio_net/dataset").expanduser()

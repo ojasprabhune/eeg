@@ -21,6 +21,8 @@ def load_physionet_data(
     save_path: str = "/Users/ojasprabhune/Documents/research/NORA/recordings/physio_net/dataset",
     recordings_path: str = "/Users/ojasprabhune/Documents/research/NORA/recordings/physio_net",
     split: str = "subject",
+    k: int = 1,
+    fold: int = 0,
     num_recordings: int = -1,
     num_epochs: int = -1,
     load_from_saved: bool = True,
@@ -39,6 +41,8 @@ def load_physionet_data(
     arrays can then be saved by save_dataset.py; this function does not save them.
     If skip_preprocessing is True, the bandpass, notch, ICA and average
     reference are skipped (uV scaling is still applied).
+    If split is "subject" and k is 1, one 80/20 subject split is used. If k > 1,
+    the subjects are cut into k chunks and chunk number `fold` is the val set.
     If num_recordings is -1, all imagined-movement and baseline recordings are used.
     """
     print(f"{Colors.HEADER}{Colors.BOLD}Initializing gesture dataset...{Colors.ENDC}")
@@ -150,14 +154,27 @@ def load_physionet_data(
     # --- dataset splitting -----------------------------------------------
 
     if split == "subject":
-        # 80% train, 20% val, same number of each subject in each split
+        # no subject is ever in both train and val
         unique_subjects = np.unique(subject_ids)
+        unique_subjects = unique_subjects[
+            ~np.isin(unique_subjects, ["S088", "S092", "S100", "S104"])
+        ]
         rng = np.random.RandomState(42)
         rng.shuffle(unique_subjects)
 
-        split_idx = round(len(unique_subjects) * 0.8)
-        train_subjects = unique_subjects[:split_idx]
-        val_subjects = unique_subjects[split_idx:]
+        if k == 1:
+            # no folding: 80% of subjects train, 20% val
+            split_idx = round(len(unique_subjects) * 0.8)
+            train_subjects = unique_subjects[:split_idx]
+            val_subjects = unique_subjects[split_idx:]
+        else:
+            # k-fold: cut the shuffled subjects into k (almost) equal chunks.
+            # chunk number `fold` is val, the other k - 1 chunks are train
+            subject_chunks = np.array_split(unique_subjects, k)
+            val_subjects = subject_chunks[fold]
+            train_subjects = unique_subjects[~np.isin(unique_subjects, val_subjects)]
+
+        print(f"{Colors.OKBLUE}Fold {fold + 1}/{k}{Colors.ENDC}")
 
         train_idx = np.where(np.isin(subject_ids, train_subjects))[0]
         val_idx = np.where(np.isin(subject_ids, val_subjects))[0]

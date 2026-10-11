@@ -3,6 +3,7 @@ Trains EEGNet (see model class file) with series of convolutions in order to
 classify a class out of 4 classes from EEG data.
 """
 
+import numpy as np
 import torch
 import yaml
 from torch import nn
@@ -18,6 +19,7 @@ with open("config/eegnet.yaml", "r") as config_file:
     experiment = config["experiment"]
     input_type = config["input_type"]
 
+    k = config["k"]
     num_epochs = config["num_epochs"]
     device = config["device"]
     batch_size = config["batch_size"]
@@ -117,14 +119,14 @@ def validate(
     return avg_loss, accuracy, f1, confusion_matrix
 
 
-def train(input_type: str, print_confusion_matrix: bool) -> float:
+def train(input_type: str, fold: int, print_confusion_matrix: bool) -> float:
     """
-    Trains one fresh GestureModel on this input_type/fold combination
-    (fold's examples held out as val, the other k-1 folds used for train).
+    Trains one fresh EEGNet on this input_type/fold combination
+    (fold's subjects held out as val, the other k-1 folds used for train).
     Returns the final val accuracy.
     """
 
-    run_name = f"eegnet_{experiment}_{input_type}"
+    run_name = f"eegnet_{experiment}_{input_type}_fold{fold}"
 
     print("\n=======================================")
     print(f"STARTING TRAINING FOR RUN: {run_name} FOR {epochs} EPOCHS")
@@ -133,6 +135,8 @@ def train(input_type: str, print_confusion_matrix: bool) -> float:
     # --- data ---
     data = load_physionet_data(
         split="subject",
+        k=k,
+        fold=fold,
         num_epochs=num_epochs,
         load_from_saved=True,
         verbose=True,
@@ -191,6 +195,7 @@ def train(input_type: str, print_confusion_matrix: bool) -> float:
 
     run = wandb.init(
         name=run_name,
+        group=f"eegnet_{experiment}_{input_type}",  # puts all folds together in wandb
         entity="prabhuneojas-evergreen-valley-high-school",
         project="eeg",
         config={
@@ -203,6 +208,8 @@ def train(input_type: str, print_confusion_matrix: bool) -> float:
             "experiment": experiment,
             "input_type": input_type,
             "epochs": epochs,
+            "k": k,
+            "fold": fold,
         },
     )
 
@@ -299,4 +306,11 @@ def train(input_type: str, print_confusion_matrix: bool) -> float:
 
 
 if __name__ == "__main__":
-    train(input_type=input_type, print_confusion_matrix=False)
+    # k = 1 is a single run, k = 5 trains 5 models (one per fold)
+    fold_accs = []
+    for fold in range(k):
+        val_acc = train(input_type=input_type, fold=fold, print_confusion_matrix=False)
+        fold_accs.append(val_acc)
+
+    print("final val acc per fold:", [round(acc, 3) for acc in fold_accs])
+    print(f"mean {np.mean(fold_accs):.3f}, std {np.std(fold_accs):.3f}")
