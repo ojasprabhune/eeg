@@ -1,3 +1,4 @@
+import json
 import time
 import warnings
 from pathlib import Path
@@ -31,6 +32,7 @@ def load_physionet_data(
     bp_window_sec: float = 1.0,
     bp_step_samples: int = 4,
     skip_preprocessing: bool = False,
+    fit_csp: bool = True,
     verbose: bool = False,
 ) -> dict:
     """
@@ -40,15 +42,18 @@ def load_physionet_data(
     If load_from_saved is False, reprocess the EDF files instead. The returned
     arrays can then be saved by save_dataset.py; this function does not save them.
     If skip_preprocessing is True, the bandpass, notch, ICA and average
-    reference are skipped (uV scaling is still applied).
+    reference are skipped (uV scaling is still applied). When loading from
+    saved, this must match the setting the saved dataset was made with.
+    If fit_csp is False, CSP is skipped (slow, and only csp inputs need it).
     If split is "subject" and k is 1, one 80/20 subject split is used. If k > 1,
     the subjects are cut into k chunks and chunk number `fold` is the val set.
     If num_recordings is -1, all imagined-movement and baseline recordings are used.
     """
     print(f"{Colors.HEADER}{Colors.BOLD}Initializing gesture dataset...{Colors.ENDC}")
     num_classes = 4  # imagined left fist, imagined right fist, rest, imagined both feet
+    class_names = ["left fist", "right fist", "rest", "both feet"]
 
-    # --- load + epoch executed runs --------------------------------------
+    # --- load + epoch imagined runs and the baseline run -----------------
 
     # matches the label scheme of get_data.py in the official repo of
     # arXiv:2004.00077 (runs 1/4/6/8/10/12/14, both-fists imagery discarded)
@@ -71,13 +76,23 @@ def load_physionet_data(
         raw_epochs = np.load(Path(save_path) / "raw_epochs.npy")
         bp_epochs = np.load(Path(save_path) / "bp_epochs.npy")
         dwt_epochs = np.load(Path(save_path) / "dwt_epochs.npy")
-        csp_epochs = np.load(Path(save_path) / "csp_epochs.npy")
         labels = np.load(Path(save_path) / "labels.npy")
         subject_ids = np.load(Path(save_path) / "subject_ids.npy")
 
-        # sanity check: 3s epochs at 160Hz and the 4 classes
-        assert raw_epochs.shape[1] == 480, raw_epochs.shape
+        # meta.json is written by save_dataset.py and says how the saved
+        # dataset was made, so we can't train on the wrong one by accident
+        with open(Path(save_path) / "meta.json", "r") as meta_file:
+            meta = json.load(meta_file)
+
+        assert meta["skip_preprocessing"] == skip_preprocessing, meta
+        assert meta["motor_exec_sec"] == motor_exec_sec, meta
+        assert meta["epoch_start_sec"] == epoch_start_sec, meta
+        assert meta["num_epochs"] == len(labels), meta
+
+        # check that the loaded epochs have the expected shape and label set
+        assert raw_epochs.shape[1] == round(motor_exec_sec * 160), raw_epochs.shape
         assert set(np.unique(labels)) == {0, 1, 2, 3}, np.unique(labels)
+        print("Saved dataset settings:", meta)
         print("Label counts:", np.bincount(labels))
 
         print(
@@ -143,9 +158,9 @@ def load_physionet_data(
         if verbose:
             print("Raw epoch uV range:", raw_epochs.min(), raw_epochs.max())
 
-        # raw: (N, T_raw, 14)
-        # bp: (N, T_bp, 84)
-        # dwt: (N, 84)
+        # raw: (N, T_raw, 64)
+        # bp: (N, T_bp, 384)
+        # dwt: (N, 384)
         # labels: (N,)
         # subject_ids: (N,)
 
@@ -203,20 +218,23 @@ def load_physionet_data(
 
     # --- CSP spatial-filter features -------------------------------------
 
-    print(f"\n{Colors.OKBLUE}Fitting CSP...{Colors.ENDC}")
+    if fit_csp:
+        print(f"\n{Colors.OKBLUE}Fitting CSP...{Colors.ENDC}")
 
-    csp_input = raw_epochs.transpose(0, 2, 1).astype(np.float64)
+        csp_input = raw_epochs.transpose(0, 2, 1).astype(np.float64)
 
-    csp = mne.decoding.CSP(n_components=6, reg="ledoit_wolf", log=True)
+        csp = mne.decoding.CSP(n_components=6, reg="ledoit_wolf", log=True)
 
-    with mne.utils.use_log_level("warning"):
-        csp.fit(csp_input[train_idx], labels[train_idx])
-        csp_epochs = csp.transform(csp_input).astype(np.float32)  # (N, 6)
+        with mne.utils.use_log_level("warning"):
+            csp.fit(csp_input[train_idx], labels[train_idx])
+            csp_epochs = csp.transform(csp_input).astype(np.float32)  # (N, 6)
 
-    # range should be hundreds of uV, not 1e-5
-    n_bad = (~np.isfinite(csp_epochs)).sum()
-    assert n_bad == 0, f"CSP epochs have {n_bad} non-finite values!"
-    print("CSP epoch uV range:", csp_epochs.min(), csp_epochs.max())
+        n_bad = (~np.isfinite(csp_epochs)).sum()
+        assert n_bad == 0, f"CSP epochs have {n_bad} non-finite values!"
+        print("CSP log-variance range:", csp_epochs.min(), csp_epochs.max())
+    else:
+        # placeholder zeros so __getitem__ still returns 5 things
+        csp_epochs = np.zeros((len(labels), 6), dtype=np.float32)
 
     if verbose:
         print(Colors.HEADER)
@@ -238,6 +256,8 @@ def load_physionet_data(
         "train_idx": train_idx,
         "val_idx": val_idx,
         "num_classes": num_classes,
+        "class_names": class_names,
+        "skip_preprocessing": skip_preprocessing,
         "verbose": verbose,
         "motor_exec_sec": motor_exec_sec,
         "epoch_start_sec": epoch_start_sec,
@@ -427,8 +447,9 @@ class PhysioNetGestureDataset(Dataset):
     from the T1/T2 annotations. T1/T2 labels depend on the run: unilateral runs
     are left/right fist, and bilateral runs are both fists/both feet.
 
-    The gestures thus only apply to the 4 class experiments, where the classes
-    are left fist, right fist, both fists, and both feet.
+    Following Wang et al. 2020 (arXiv:2004.00077), the 4 classes are imagined
+    left fist, imagined right fist, rest (from baseline run 1), and imagined
+    both feet. Imagined both fists is not used.
 
     The dataset returns raw, bandpower, CSP, and DWT features with a
     zero-based class label, just like GestureDataset.

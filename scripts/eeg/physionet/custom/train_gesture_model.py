@@ -21,8 +21,9 @@ from eeg.gesture2hand import GestureModel, PhysioNetGestureDataset, load_physion
 with open("config/gesture_model.yaml", "r") as config_file:
     config = yaml.safe_load(config_file)
 
-    experiment = config["experiment"]
     input_type = config["input_type"]
+    skip_preprocessing = config["skip_preprocessing"]
+    k = config["k"]
 
     num_layers = config["num_layers"]
     decoder_num_layers = config["decoder_num_layers"]
@@ -32,7 +33,6 @@ with open("config/gesture_model.yaml", "r") as config_file:
     encoder_dropout = config["encoder_dropout"]
     decoder_dropout = config["decoder_dropout"]
 
-    num_recordings = config["num_recordings"]
     device = config["device"]
     batch_size = config["batch_size"]
     warmup_steps = config["warmup_steps"]
@@ -130,21 +130,29 @@ def validate(
     return avg_loss, accuracy, f1, confusion_matrix
 
 
-def train(input_type: str, print_confusion_matrix: bool) -> float:
+def train(input_type: str, fold: int, print_confusion_matrix: bool) -> float:
     """
     Trains one fresh GestureModel on this input_type/fold combination
     (fold's examples held out as val, the other k-1 folds used for train).
     Returns the final val accuracy.
     """
 
-    run_name = f"gesture_model_{experiment}_{input_type}"
+    run_name = f"gesture_model_physionet_{input_type}_fold{fold}"
 
     print("\n=======================================")
     print(f"STARTING TRAINING FOR RUN: {run_name} FOR {epochs} EPOCHS")
     print("=======================================")
 
     # --- data ---
-    data = load_physionet_data(split="subject", load_from_saved=True, verbose=True)
+    data = load_physionet_data(
+        split="subject",
+        k=k,
+        fold=fold,
+        load_from_saved=True,
+        skip_preprocessing=skip_preprocessing,
+        fit_csp=(input_type == "csp"),  # CSP is slow, only fit it when used
+        verbose=True,
+    )
     train_dataset = PhysioNetGestureDataset(data, mode="train")
     val_dataset = PhysioNetGestureDataset(data, mode="val")
 
@@ -206,8 +214,9 @@ def train(input_type: str, print_confusion_matrix: bool) -> float:
         config={
             "learning_rate": base_lr,
             "architecture": "GestureModel",
-            "dataset": "gesture_dataset",
-            "experiment": experiment,
+            "dataset": "physionet",
+            "skip_preprocessing": skip_preprocessing,
+            "fold": fold,
             "input_type": input_type,
             "epochs": epochs,
         },
@@ -285,4 +294,4 @@ def train(input_type: str, print_confusion_matrix: bool) -> float:
 
 
 if __name__ == "__main__":
-    train(input_type=input_type, print_confusion_matrix=False)
+    train(input_type=input_type, fold=0, print_confusion_matrix=False)

@@ -3,6 +3,8 @@ Trains EEGNet (see model class file) with series of convolutions in order to
 classify a class out of 4 classes from EEG data.
 """
 
+from pathlib import Path
+
 import numpy as np
 import torch
 import yaml
@@ -18,6 +20,7 @@ with open("config/eegnet.yaml", "r") as config_file:
 
     experiment = config["experiment"]
     input_type = config["input_type"]
+    skip_preprocessing = config["skip_preprocessing"]
 
     k = config["k"]
     num_epochs = config["num_epochs"]
@@ -30,14 +33,8 @@ with open("config/eegnet.yaml", "r") as config_file:
     save_ckpt_path = config["save_ckpt_path"]
     save_every = config["save_every"]
 
-num_channels = 64
-num_features = 6
-num_features_by_input_type = {
-    "raw": num_channels,
-    "bandpower": num_channels * num_features,
-    "csp": num_features,
-    "dwt": num_channels * num_features,
-}
+if save_ckpt_path is not None:
+    Path(save_ckpt_path).parent.mkdir(parents=True, exist_ok=True)
 
 
 def select_input(
@@ -119,7 +116,7 @@ def validate(
     return avg_loss, accuracy, f1, confusion_matrix
 
 
-def train(input_type: str, fold: int, print_confusion_matrix: bool) -> float:
+def train(input_type: str, fold: int) -> float:
     """
     Trains one fresh EEGNet on this input_type/fold combination
     (fold's subjects held out as val, the other k-1 folds used for train).
@@ -139,17 +136,18 @@ def train(input_type: str, fold: int, print_confusion_matrix: bool) -> float:
         fold=fold,
         num_epochs=num_epochs,
         load_from_saved=True,
+        skip_preprocessing=skip_preprocessing,
+        fit_csp=(input_type == "csp"),  # CSP is slow, only fit it when used
         verbose=True,
     )
+    class_names = data["class_names"]
     train_dataset = PhysioNetGestureDataset(data, mode="train")
     val_dataset = PhysioNetGestureDataset(data, mode="val")
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
     # --- model ---
-
-    num_features = num_features_by_input_type[input_type]
 
     model = (
         EEGNet(
@@ -169,9 +167,10 @@ def train(input_type: str, fold: int, print_confusion_matrix: bool) -> float:
     raw, bp, csp, dwt, labels = train_dataset[0]
     features = select_input(raw, bp, csp, dwt, input_type).to(device)  #  (T, C)
 
+    # one forward pass so LazyLinear finds out its input size
     dummy_batch = features.transpose(0, 1).unsqueeze(0).unsqueeze(0)  # (1, 1, C, T)
     with torch.no_grad():
-        dummy_out = model(dummy_batch)
+        model(dummy_batch)
 
     param_count = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"Number of model parameters: {param_count:,}")
@@ -207,6 +206,7 @@ def train(input_type: str, fold: int, print_confusion_matrix: bool) -> float:
             "dataset": "physionet",
             "experiment": experiment,
             "input_type": input_type,
+            "skip_preprocessing": skip_preprocessing,
             "epochs": epochs,
             "k": k,
             "fold": fold,
@@ -261,26 +261,28 @@ def train(input_type: str, fold: int, print_confusion_matrix: bool) -> float:
         val_loss, val_acc, val_f1, confusion_matrix = validate(
             model, val_loader, loss_fn, input_type, train_dataset.num_classes
         )
-        run.log(
-            {
-                "train_loss": epoch_train_loss / n_batches,
-                "train_acc": n_correct / n_total,
-                "lr": optimizer.param_groups[0]["lr"],
-                "val_loss": val_loss,
-                "val_acc": val_acc,
-                "val_f1": val_f1,
-                "epoch": i + 1,
-            }
-        )
+        log = {
+            "train_loss": epoch_train_loss / n_batches,
+            "train_acc": n_correct / n_total,
+            "lr": optimizer.param_groups[0]["lr"],
+            "val_loss": val_loss,
+            "val_acc": val_acc,
+            "val_f1": val_f1,
+            "epoch": i + 1,
+        }
+
+        # recall per class: of the val trials that really are this class,
+        # how many did the model get right (row of the confusion matrix)
+        for cls, name in enumerate(class_names):
+            n_true = confusion_matrix[cls].sum().item()
+            log[f"val_recall/{name}"] = confusion_matrix[cls][cls].item() / max(n_true, 1)
+
+        run.log(log)
         scheduler.step()
 
         epoch_tqdm.set_postfix(
             {"val_loss": f"{val_loss:.4f}", "val_acc": f"{val_acc:.3f}"}
         )
-
-        if (i + 1) % 100 == 0 and print_confusion_matrix:
-            print(f"\n{run_name} epoch {i + 1} validation confusion matrix:")
-            print(confusion_matrix)
 
         if (i + 1) % save_every == 0 and save_ckpt_path is not None:
             latest_ckpt = {
@@ -289,6 +291,14 @@ def train(input_type: str, fold: int, print_confusion_matrix: bool) -> float:
                 "optimizer": optimizer.state_dict(),
             }
             torch.save(latest_ckpt, f"{save_ckpt_path}_{run_name}_epoch_{i + 1}.pth")
+
+    # final confusion matrix (rows = true class, cols = predicted class)
+    print(f"\n{run_name} final validation confusion matrix ({class_names}):")
+    print(confusion_matrix)
+    table = wandb.Table(columns=["true class"] + class_names)
+    for cls, name in enumerate(class_names):
+        table.add_data(name, *confusion_matrix[cls].tolist())
+    run.log({"val_confusion_matrix": table})
 
     run.finish()
 
@@ -309,7 +319,7 @@ if __name__ == "__main__":
     # k = 1 is a single run, k = 5 trains 5 models (one per fold)
     fold_accs = []
     for fold in range(k):
-        val_acc = train(input_type=input_type, fold=fold, print_confusion_matrix=False)
+        val_acc = train(input_type=input_type, fold=fold)
         fold_accs.append(val_acc)
 
     print("final val acc per fold:", [round(acc, 3) for acc in fold_accs])

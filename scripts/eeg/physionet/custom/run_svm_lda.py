@@ -2,7 +2,7 @@
 For the Physionet EEG Motor Movement/Imagery Dataset.
 
 SVM and LDA ran directly on the CSP and DWT per-trial feature vectors that
-GestureDatasetmakes.
+load_physionet_data makes.
 """
 
 import numpy as np
@@ -10,10 +10,9 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 
-from eeg.gesture2hand import PhysioNetGestureDataset
+from eeg.gesture2hand import load_physionet_data
 
-experiment = "common_8_letters"
-num_recordings = 5
+skip_preprocessing = True  # must match the saved dataset (see meta.json)
 k = 5
 
 
@@ -44,40 +43,42 @@ lda_accuracies_csp = []
 lda_accuracies_dwt = []
 
 for fold in range(k):
-    dataset = PhysioNetGestureDataset(split="subject", load_from_saved=True)
+    data = load_physionet_data(
+        split="subject", k=k, fold=fold, skip_preprocessing=skip_preprocessing
+    )
 
     acc = evaluate(
-        dataset.csp_epochs,
-        dataset.labels,
-        dataset.train_idx,
-        dataset.val_idx,
+        data["csp_epochs"],
+        data["labels"],
+        data["train_idx"],
+        data["val_idx"],
         SVC(kernel="rbf"),
     )
     svm_accuracies_csp.append(acc)
 
     acc = evaluate(
-        dataset.dwt_epochs,
-        dataset.labels,
-        dataset.train_idx,
-        dataset.val_idx,
+        data["dwt_epochs"],
+        data["labels"],
+        data["train_idx"],
+        data["val_idx"],
         SVC(kernel="rbf"),
     )
     svm_accuracies_dwt.append(acc)
 
     acc = evaluate(
-        dataset.csp_epochs,
-        dataset.labels,
-        dataset.train_idx,
-        dataset.val_idx,
+        data["csp_epochs"],
+        data["labels"],
+        data["train_idx"],
+        data["val_idx"],
         LinearDiscriminantAnalysis(),
     )
     lda_accuracies_csp.append(acc)
 
     acc = evaluate(
-        dataset.dwt_epochs,
-        dataset.labels,
-        dataset.train_idx,
-        dataset.val_idx,
+        data["dwt_epochs"],
+        data["labels"],
+        data["train_idx"],
+        data["val_idx"],
         LinearDiscriminantAnalysis(),
     )
     lda_accuracies_dwt.append(acc)
@@ -90,7 +91,7 @@ def report(name: str, accuracies: list[float]) -> None:
     print(f"{name}: {accuracies_arr.mean():.3f} +/- {accuracies_arr.std():.3f}")
 
 
-print(f"\nchance level (1/{6}): {1 / 6:.3f}\n")
+print(f"\nchance level (1/4): {1 / 4:.3f}\n")
 report("SVM + CSP", svm_accuracies_csp)
 report("SVM + DWT", svm_accuracies_dwt)
 report("LDA + CSP", lda_accuracies_csp)

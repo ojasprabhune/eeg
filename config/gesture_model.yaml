@@ -1,7 +1,8 @@
 # gesture model (EEG epoch -> gesture class, encoder + decoder query)
 
-experiment: common_8_letters
-input_type: bandpower # "raw" (14 ch), "bandpower" (84 feat), "csp" (6 feat), or "dwt" (84 feat) - used when running this file directly
+experiment: common_8_letters # own data only (scripts/eeg/self), physionet ignores this
+input_type: bandpower # "raw", "bandpower", "csp", or "dwt" - used when running this file directly
+skip_preprocessing: true # physionet only, must match the saved dataset (see meta.json)
 
 num_layers: 2
 decoder_num_layers: 2
@@ -14,6 +15,7 @@ decoder_dropout: 0.1
 # training
 
 num_recordings: 3
+k: 1 # number of folds. 1 = single run, no folding
 device: cpu
 batch_size: 32
 warmup_steps: 500

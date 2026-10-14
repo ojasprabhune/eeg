@@ -10,7 +10,7 @@ Handles EEG data loading, preprocessing, and feature extraction.
   - `gesture_dataset.py`: `GestureDataset` loads XDF recordings and extracts labeled movement epochs from cue markers, with raw EEG, bandpower, CSP, and DWT features.
   - `temporal_dataset.py`: `TemporalDataset` loads continuous FIF recordings and saved class labels, aligns EEG and bandpower features, and extracts sliding windows with configurable stride. It returns EEG, bandpower features, and one majority class label per window.
 - `existing/`: Datasets from public sources.
-  - `physio_net_gesture_dataset.py`: `PhysioNetGestureDataset` loads the PhysioNet EEG Motor Movement/Imagery Dataset (EEGMMIDB). It uses 160 Hz executed-movement recordings for four classes: left fist, right fist, both fists, and both feet. It provides raw EEG, bandpower, CSP, and DWT features and supports loading saved epochs.
+  - `physio_net_gesture_dataset.py`: `PhysioNetGestureDataset` loads the PhysioNet EEG Motor Movement/Imagery Dataset (EEGMMIDB). Following Wang et al. 2020, it uses 160 Hz imagined-movement recordings plus baseline run 1 for four classes: left fist, right fist, rest, and both feet. It provides raw EEG, bandpower, CSP, and DWT features, supports subject k-fold splits, and loads saved epochs (checked against `meta.json`).
 - `utils.py`: Shared bandpower and DWT feature extraction, Emotiv channel names, and terminal colors.
 
 ### [models/](models/)

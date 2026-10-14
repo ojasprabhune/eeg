@@ -19,11 +19,12 @@ from sklearn.metrics import balanced_accuracy_score, confusion_matrix
 from sklearn.preprocessing import StandardScaler
 
 import wandb
-from eeg.gesture2hand import PhysioNetGestureDataset
+from eeg.gesture2hand import load_physionet_data
 
 os.environ["WANDB_SILENT"] = "True"  # make wandb shh
 np.seterr(all="ignore")
 
+skip_preprocessing = True  # must match the saved dataset (see meta.json)
 input_types = ["csp", "dwt"]
 max_epochs = 3000
 patience = 300  # stop once val_acc hasn't beaten its best in this many epochs
@@ -94,32 +95,24 @@ def run_one(
     run.finish()
 
     # --- diagnostics at the best epoch ---------------------------------------
-    # classes: 0 left fist, 1 right fist, 2 both fists, 3 both feet
-    # y // 2 gives the block: 0 = left/right fist, 1 = both fists/both feet
+    # classes: 0 left fist, 1 right fist, 2 rest, 3 both feet
     print(f"\n{run_name} confusion matrix (rows = true, cols = predicted):")
     print(confusion_matrix(y_val, best_y_preds, labels=[0, 1, 2, 3]))
     print("balanced acc:", balanced_accuracy_score(y_val, best_y_preds))
 
-    same_block = (best_y_preds // 2) == (y_val // 2)
-    print("block acc:", same_block.mean())
-    print(
-        "within-block acc:",
-        (best_y_preds[same_block] == y_val[same_block]).mean(),
-    )
-
     return best_epoch, best_val_acc
 
 
-dataset = PhysioNetGestureDataset(split="subject", load_from_saved=True)
+data = load_physionet_data(split="subject", skip_preprocessing=skip_preprocessing)
 
 for input_type in input_types:
-    features = dataset.csp_epochs if input_type == "csp" else dataset.dwt_epochs
+    features = data["csp_epochs"] if input_type == "csp" else data["dwt_epochs"]
 
     best_epoch, best_val_acc = run_one(
         features,
-        dataset.labels,
-        dataset.train_idx,
-        dataset.val_idx,
+        data["labels"],
+        data["train_idx"],
+        data["val_idx"],
         run_name=f"sgd_svm_{input_type}",
     )
 
