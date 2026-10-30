@@ -390,6 +390,11 @@ def _epoch_recording(
         # since we are not rest, run_labels should be a dict of T1/T2 labels
         assert isinstance(run_labels, dict)
 
+        # run_labels maps T1/T2 to a class label, but event_ids maps T1/T2 to an integer
+        # code, so they look like this:
+        # run_labels = {"T1": 0, "T2": 1}
+        # event_ids = {2: 0, 3: 1}
+
         event_codes = {
             event_ids[name]: label
             for name, label in run_labels.items()

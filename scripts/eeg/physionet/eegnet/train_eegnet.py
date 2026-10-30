@@ -130,6 +130,7 @@ def train(input_type: str, fold: int) -> float:
     print("=======================================")
 
     # --- data ---
+
     data = load_physionet_data(
         split="subject",
         k=k,
@@ -275,7 +276,9 @@ def train(input_type: str, fold: int) -> float:
         # how many did the model get right (row of the confusion matrix)
         for cls, name in enumerate(class_names):
             n_true = confusion_matrix[cls].sum().item()
-            log[f"val_recall/{name}"] = confusion_matrix[cls][cls].item() / max(n_true, 1)
+            log[f"val_recall/{name}"] = confusion_matrix[cls][cls].item() / max(
+                n_true, 1
+            )
 
         run.log(log)
         scheduler.step()
